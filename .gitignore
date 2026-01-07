@@ -1,0 +1,50 @@
+﻿# Default ignored files
+/shelf/
+/workspace.xml
+# Rider ignored files
+/projectSettingsUpdater.xml
+/contentModel.xml
+/modules.xml
+/.idea.TajsView.iml
+# Ignored default folder with query files
+/queries/
+# Datasource local storage ignored files
+/dataSources/
+/dataSources.local.xml
+# Editor-based HTTP Client requests
+/httpRequests/
+
+.idea/
+
+*.uid
+
+*.import
+
+docs/private/*
+
+# build output
+/docs/dist/
+# generated types
+/docs/astro/
+
+# dependencies
+/docs/node_modules/
+
+# logs
+/docs/npm-debug.log*
+/docs/yarn-debug.log*
+/docs/yarn-error.log*
+/docs/pnpm-debug.log*
+
+
+# environment variables
+/docs/.env
+/docs/.env.production
+
+# macOS-specific files
+/docs/.DS_Store
+
+
+.vscode/
+
+docs/.vscode
