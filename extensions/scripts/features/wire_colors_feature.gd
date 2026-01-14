@@ -107,7 +107,7 @@ func set_color(resource_id: String, color: Color) -> void:
 	var hex = color.to_html(false)
 	_custom_hex[resource_id] = hex
 	_ensure_custom_connector(resource_id, hex)
-	if _enabled and Data.resources.has(resource_id):
+	if _enabled and Data != null and Data.resources != null and Data.resources.has(resource_id):
 		Data.resources[resource_id].color = "custom_" + resource_id
 	_refresh_connectors()
 
@@ -115,7 +115,7 @@ func set_color(resource_id: String, color: Color) -> void:
 func reset_color(resource_id: String) -> void:
 	if _custom_hex.has(resource_id):
 		_custom_hex.erase(resource_id)
-	if _original_colors.has(resource_id) and Data.resources.has(resource_id):
+	if _original_colors.has(resource_id) and Data != null and Data.resources != null and Data.resources.has(resource_id):
 		Data.resources[resource_id].color = _original_colors[resource_id]
 	_refresh_connectors()
 
@@ -127,6 +127,8 @@ func reset_all() -> void:
 
 
 func apply_overrides() -> void:
+	if Data == null or Data.resources == null:
+		return
 	for resource_id in _custom_hex:
 		var color_key = "custom_" + resource_id
 		if Data.resources.has(resource_id):
@@ -134,6 +136,8 @@ func apply_overrides() -> void:
 
 
 func revert_overrides() -> void:
+	if Data == null or Data.resources == null:
+		return
 	for resource_id in _original_colors:
 		if Data.resources.has(resource_id):
 			Data.resources[resource_id].color = _original_colors[resource_id]
@@ -142,9 +146,9 @@ func revert_overrides() -> void:
 func get_color(resource_id: String) -> Color:
 	if _custom_hex.has(resource_id):
 		return Color(_custom_hex[resource_id])
-	if Data.resources.has(resource_id):
+	if Data != null and Data.resources != null and Data.resources.has(resource_id):
 		var color_name = Data.resources[resource_id].color
-		if Data.connectors.has(color_name):
+		if Data.connectors != null and Data.connectors.has(color_name):
 			return Color(Data.connectors[color_name].color)
 	return Color.WHITE
 
@@ -152,7 +156,7 @@ func get_color(resource_id: String) -> Color:
 func get_original_color(resource_id: String) -> Color:
 	if _original_colors.has(resource_id):
 		var color_name = _original_colors[resource_id]
-		if Data.connectors.has(color_name):
+		if Data != null and Data.connectors != null and Data.connectors.has(color_name):
 			return Color(Data.connectors[color_name].color)
 	return Color.WHITE
 
@@ -171,6 +175,8 @@ func _capture_original_colors() -> void:
 
 
 func _ensure_custom_connector(resource_id: String, hex_color: String) -> void:
+	if Data == null or Data.connectors == null:
+		return
 	var color_key = "custom_" + resource_id
 	Data.connectors[color_key] = {
 		"letter": resource_id.substr(0, 1).to_upper(),
@@ -179,6 +185,8 @@ func _ensure_custom_connector(resource_id: String, hex_color: String) -> void:
 
 
 func _rebuild_custom_connectors() -> void:
+	if Data == null or Data.connectors == null:
+		return
 	for resource_id in _custom_hex:
 		_ensure_custom_connector(resource_id, _custom_hex[resource_id])
 
@@ -186,20 +194,32 @@ func _rebuild_custom_connectors() -> void:
 func _refresh_connectors() -> void:
 	if _tree == null:
 		return
+	if Data == null or Data.connectors == null:
+		return
 	var connectors = _tree.get_nodes_in_group("connector")
 	for connector in connectors:
 		if connector is Connector:
 			var output_res = connector.output
-			if output_res:
-				var output_connector_btn = output_res.get_node_or_null("OutputConnector")
-				if output_connector_btn and output_connector_btn.has_method("get_connector_color"):
-					var color_name = output_connector_btn.get_connector_color()
-					if Data.connectors.has(color_name):
-						connector.color = Color(Data.connectors[color_name].color)
-						if connector.pivot:
-							connector.pivot.self_modulate = connector.color
-						connector.draw_update()
-
+			if output_res and output_res is ResourceContainer:
+				var resource_id: String = output_res.resource
+				if resource_id.is_empty():
+					continue
+				var target_color: Color = Color.WHITE
+				if _enabled and _custom_hex.has(resource_id):
+					# Use custom color
+					target_color = Color(_custom_hex[resource_id])
+				else:
+					# Use original color from Data.connectors
+					var original_color_name = _original_colors.get(resource_id, "")
+					if original_color_name.is_empty() and Data.resources != null and Data.resources.has(resource_id):
+						original_color_name = Data.resources[resource_id].color
+					if not original_color_name.is_empty() and Data.connectors.has(original_color_name):
+						target_color = Color(Data.connectors[original_color_name].color)
+				connector.color = target_color
+				if connector.pivot:
+					connector.pivot.self_modulate = target_color
+				connector.draw_update()
+	
 	var windows = _tree.get_nodes_in_group("window")
 	for window in windows:
 		var buttons = _find_connector_buttons(window)

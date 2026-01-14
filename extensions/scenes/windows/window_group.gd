@@ -72,6 +72,7 @@ func set_qol_color_picker_enabled(enabled: bool) -> void:
 		_setup_color_picker()
 	else:
 		_hide_color_picker_ui()
+	update_color()
 
 
 func update_color() -> void:
