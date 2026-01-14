@@ -1,3 +1,8 @@
+# ==============================================================================
+# Taj's QoL - Main
+# Author: TajemnikTV
+# Description: Adds QoL features to the game
+# ==============================================================================
 extends Node
 
 const MOD_ID := "TajemnikTV-QoL"
@@ -47,6 +52,9 @@ const SETTING_GROUP_COLOR_PICKER_ENABLED := "%s.group_color_picker_enabled" % SE
 const SETTING_GROUP_PATTERNS_DATA := "%s.group_patterns" % SETTINGS_PREFIX
 const SETTING_BOOT_SCREEN_ENABLED := "%s.boot_screen_enabled" % SETTINGS_PREFIX
 const SETTING_COLOR_PICKER_DATA := "%s.color_picker" % SETTINGS_PREFIX
+const SETTING_HIDE_PURCHASED_TOKENS := "%s.hide_purchased_tokens" % SETTINGS_PREFIX
+const SETTING_HIDE_MAXED_UPGRADES := "%s.hide_maxed_upgrades" % SETTINGS_PREFIX
+const SETTING_HIDE_CLAIMED_REQUESTS := "%s.hide_claimed_requests" % SETTINGS_PREFIX
 
 const SETTINGS_KEYS := [
 	SETTING_SMART_SELECT_ENABLED,
@@ -108,8 +116,12 @@ var _color_picker_callback: Callable = Callable()
 
 
 func _init() -> void:
-	if ClassDB.class_exists("ModLoaderMod"):
+	if TajsCoreUtil.has_global_class("ModLoaderMod"):
 		ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/windows/window_group.gd")
+		ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/tokens_tab.gd")
+		ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/upgrades_tab.gd")
+		ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/request_panel.gd")
+		ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/requests_tab.gd")
 	_core = _get_core()
 	if _core == null:
 		_log_warn("Taj's Core not found; QoL disabled.")
@@ -145,7 +157,7 @@ func _get_core():
 
 
 func _is_wire_drop_mod_active() -> bool:
-	if not ClassDB.class_exists("ModLoaderMod"):
+	if not TajsCoreUtil.has_global_class("ModLoaderMod"):
 		return false
 	var data = ModLoaderMod.get_mod_data("TajemnikTV-WireDrop")
 	if data == null:
@@ -303,6 +315,21 @@ func _register_settings() -> void:
 			"type": "dict",
 			"default": {},
 			"description": "Color picker swatches and recents"
+		},
+		SETTING_HIDE_PURCHASED_TOKENS: {
+			"type": "bool",
+			"default": true,
+			"description": "Hide purchased tokens in the shop"
+		},
+		SETTING_HIDE_MAXED_UPGRADES: {
+			"type": "bool",
+			"default": true,
+			"description": "Hide maxed upgrades in the shop"
+		},
+		SETTING_HIDE_CLAIMED_REQUESTS: {
+			"type": "bool",
+			"default": true,
+			"description": "Hide claimed requests"
 		}
 	}
 	_settings.register_schema(MOD_ID, schema)
@@ -896,7 +923,7 @@ func get_mod_name() -> String:
 func _log_warn(message: String) -> void:
 	if _core != null and _core.has_method("logw"):
 		_core.logw(MOD_ID, message)
-	elif ClassDB.class_exists("ModLoaderLog"):
+	elif TajsCoreUtil.has_global_class("ModLoaderLog"):
 		ModLoaderLog.warning(message, LOG_NAME)
 	else:
 		print("%s %s" % [LOG_NAME, message])

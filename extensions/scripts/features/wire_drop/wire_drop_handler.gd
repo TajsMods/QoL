@@ -253,7 +253,7 @@ func _is_debug_enabled() -> bool:
 func _log_info(message: String) -> void:
 	if _logger != null and _logger.has_method("info"):
 		_logger.info("wire_drop", message)
-	elif ClassDB.class_exists("ModLoaderLog"):
+	elif TajsCoreUtil.has_global_class("ModLoaderLog"):
 		ModLoaderLog.info(message, LOG_NAME)
 	else:
 		print("%s %s" % [LOG_NAME, message])
@@ -262,7 +262,7 @@ func _log_info(message: String) -> void:
 func _log_warn(message: String) -> void:
 	if _logger != null and _logger.has_method("warn"):
 		_logger.warn("wire_drop", message)
-	elif ClassDB.class_exists("ModLoaderLog"):
+	elif TajsCoreUtil.has_global_class("ModLoaderLog"):
 		ModLoaderLog.warning(message, LOG_NAME)
 	else:
 		print("%s %s" % [LOG_NAME, message])

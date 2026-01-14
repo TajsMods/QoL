@@ -4,11 +4,6 @@ const SETTINGS_ENABLED_KEY := "tajs_qol.group_patterns_enabled"
 const SETTINGS_DATA_KEY := "tajs_qol.group_patterns"
 const SETTINGS_COLOR_PICKER_ENABLED_KEY := "tajs_qol.group_color_picker_enabled"
 
-const NEW_COLORS: Array[String] = [
-	"1a202c", "1a2b22", "1a292b", "1a1b2b", "211a2b", "2b1a27", "2b1a1a",
-	"BE4242", "FFA500", "FFFF00", "00FF00", "00FFFF", "0000FF", "800080", "FF00FF", "252525", "000000"
-]
-
 const VANILLA_COLORS: Array[String] = ["1a202c", "1a2b22", "1a292b", "1a1b2b", "211a2b", "2b1a27", "2b1a1a"]
 
 const PatternDrawerScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/ui/pattern_drawer.gd")
@@ -38,9 +33,7 @@ func _ready() -> void:
 	_color_picker_enabled = _is_color_picker_enabled()
 	if not _patterns_enabled:
 		return
-	_setup_color_picker()
-	_setup_pattern_picker()
-	_inject_pattern_drawers()
+	_ensure_pattern_ui()
 	_load_from_settings()
 	update_color()
 	update_pattern()
@@ -49,9 +42,7 @@ func _ready() -> void:
 func set_qol_patterns_enabled(enabled: bool) -> void:
 	_patterns_enabled = enabled
 	if _patterns_enabled:
-		_setup_color_picker()
-		_setup_pattern_picker()
-		_inject_pattern_drawers()
+		_ensure_pattern_ui()
 		_load_from_settings()
 		update_color()
 		update_pattern()
@@ -63,6 +54,7 @@ func set_qol_patterns_enabled(enabled: bool) -> void:
 		color = clampi(color, 0, VANILLA_COLORS.size() - 1)
 		update_color()
 		update_pattern()
+
 
 func set_qol_color_picker_enabled(enabled: bool) -> void:
 	_color_picker_enabled = enabled
@@ -90,7 +82,7 @@ func update_color() -> void:
 	if custom_color != Color.TRANSPARENT:
 		use_color = custom_color
 	else:
-		use_color = Color(NEW_COLORS[color])
+		use_color = Color(VANILLA_COLORS[clampi(color, 0, VANILLA_COLORS.size() - 1)])
 	$TitlePanel.self_modulate = use_color
 	$PanelContainer.self_modulate = use_color
 
@@ -99,20 +91,14 @@ func cycle_color() -> void:
 	if not _patterns_enabled:
 		super.cycle_color()
 		return
-	if _color_picker_enabled and _color_picker_layer:
-		_color_picker_layer.visible = true
-		_color_picker.position = (_color_picker.get_viewport_rect().size - _color_picker.size) / 2
-		Sound.play("click2")
-	else:
-		if _color_picker_enabled:
-			color += 1
-			if color >= NEW_COLORS.size():
-				color = 0
-			custom_color = Color.TRANSPARENT
-			update_color()
-			color_changed.emit()
-		else:
-			super.cycle_color()
+	if _open_color_picker():
+		return
+	color += 1
+	if color >= VANILLA_COLORS.size():
+		color = 0
+	custom_color = Color.TRANSPARENT
+	update_color()
+	color_changed.emit()
 
 
 func _on_color_button_pressed() -> void:
@@ -132,12 +118,19 @@ func _setup_color_picker() -> void:
 	if not _color_picker_enabled:
 		return
 	if _color_picker_layer != null:
+		if not _color_picker_layer.is_inside_tree() and get_tree() != null:
+			get_tree().root.add_child(_color_picker_layer)
+		if _color_picker == null:
+			_create_color_picker_panel()
 		return
 	_color_picker_layer = CanvasLayer.new()
 	_color_picker_layer.name = "QolColorPickerLayer"
 	_color_picker_layer.layer = 100
 	_color_picker_layer.visible = false
-	get_tree().root.call_deferred("add_child", _color_picker_layer)
+	if get_tree() != null:
+		get_tree().root.add_child(_color_picker_layer)
+	else:
+		call_deferred("_ensure_color_picker_in_tree")
 
 	var bg_overlay = ColorRect.new()
 	bg_overlay.name = "BackgroundOverlay"
@@ -150,11 +143,20 @@ func _setup_color_picker() -> void:
 	)
 	_color_picker_layer.add_child(bg_overlay)
 
+	_create_color_picker_panel()
+
+
+func _create_color_picker_panel() -> void:
+	if _color_picker != null:
+		return
+	if _color_picker_layer == null:
+		return
 	_color_picker = ColorPickerPanelScript.new()
 	_color_picker.name = "QolColorPickerPanel"
 	if _color_picker.has_method("setup"):
 		_color_picker.call("setup", _get_core_settings(), "tajs_qol.color_picker")
-	_color_picker.set_color(custom_color if custom_color != Color.TRANSPARENT else Color(NEW_COLORS[color]))
+	var initial_color = custom_color if custom_color != Color.TRANSPARENT else Color(VANILLA_COLORS[clampi(color, 0, VANILLA_COLORS.size() - 1)])
+	_color_picker.set_color(initial_color)
 	_color_picker.color_changed.connect(_on_color_picked)
 	_color_picker.color_committed.connect(func(_c):
 		_color_picker_layer.visible = false
@@ -162,8 +164,15 @@ func _setup_color_picker() -> void:
 	_color_picker_layer.add_child(_color_picker)
 
 
+func _ensure_color_picker_in_tree() -> void:
+	if _color_picker_layer != null and not _color_picker_layer.is_inside_tree() and get_tree() != null:
+		get_tree().root.add_child(_color_picker_layer)
+
+
 func _setup_pattern_picker() -> void:
 	if _pattern_picker_layer != null:
+		if not _pattern_picker_layer.is_inside_tree() and get_tree() != null:
+			get_tree().root.add_child(_pattern_picker_layer)
 		_add_pattern_button()
 		return
 	_pattern_picker_layer = CanvasLayer.new()
@@ -191,8 +200,15 @@ func _setup_pattern_picker() -> void:
 	)
 	_pattern_picker_layer.add_child(_pattern_picker)
 
-	get_tree().root.call_deferred("add_child", _pattern_picker_layer)
+	if get_tree() != null:
+		get_tree().root.call_deferred("add_child", _pattern_picker_layer)
 	_add_pattern_button()
+
+
+func _ensure_pattern_ui() -> void:
+	_setup_color_picker()
+	_setup_pattern_picker()
+	_inject_pattern_drawers()
 
 
 func _add_pattern_button() -> void:
@@ -217,7 +233,12 @@ func _add_pattern_button() -> void:
 	pattern_btn.expand_icon = true
 	pattern_btn.tooltip_text = "Pattern Settings"
 	pattern_btn.pressed.connect(_open_pattern_picker)
-	title_container.add_child(pattern_btn)
+	var color_btn = title_container.get_node_or_null("ColorButton")
+	if color_btn != null:
+		title_container.add_child(pattern_btn)
+		title_container.move_child(pattern_btn, color_btn.get_index())
+	else:
+		title_container.add_child(pattern_btn)
 
 
 func _inject_pattern_drawers() -> void:
@@ -263,6 +284,18 @@ func _open_pattern_picker() -> void:
 		_pattern_picker_layer.visible = true
 		_pattern_picker.position = (_pattern_picker.get_viewport_rect().size - _pattern_picker.size) / 2
 		Sound.play("click2")
+
+
+func _open_color_picker() -> bool:
+	if not _color_picker_enabled:
+		return false
+	_setup_color_picker()
+	if _color_picker_layer and _color_picker:
+		_color_picker_layer.visible = true
+		_color_picker.position = (_color_picker.get_viewport_rect().size - _color_picker.size) / 2
+		Sound.play("click2")
+		return true
+	return false
 
 
 func _close_pattern_picker() -> void:
