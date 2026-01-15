@@ -273,7 +273,7 @@ func _setup_color_picker():
 		_color_picker.call("setup", _get_core_settings(), "tajs_qol.color_picker")
 	_color_picker.set_color(_pattern_color)
 	_color_picker.color_changed.connect(_on_color_picked)
-	_color_picker.color_committed.connect(func(c):
+	_color_picker.color_committed.connect(func(_c):
 		_color_picker_layer.visible = false
 	)
 	_color_picker_layer.add_child(_color_picker)
@@ -283,7 +283,7 @@ func _setup_color_picker():
 
 
 func _add_picker_to_root():
-	if _color_picker_layer and not _color_picker_layer.is_inside_tree():
+	if _color_picker_layer and _color_picker_layer.get_parent() == null and not _color_picker_layer.is_inside_tree():
 		get_tree().root.add_child(_color_picker_layer)
 
 func _get_core_settings():

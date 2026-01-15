@@ -83,10 +83,12 @@ const SETTINGS_KEYS := [
 	SETTING_GROUP_PATTERNS_DATA,
 	SETTING_BOOT_SCREEN_ENABLED
 ]
+const StickyNoteManagerScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/sticky_notes/sticky_note_manager.gd")
 
 var _core
 var _settings
 var _ui_manager
+var _sticky_note_manager
 
 var _smart_select
 var _wire_clear
@@ -380,6 +382,10 @@ func _init_features() -> void:
 
 	_group_patterns = GroupPatternsFeatureScript.new()
 
+	_sticky_note_manager = StickyNoteManagerScript.new()
+	_sticky_note_manager.setup(_settings, get_tree(), self)
+	add_child(_sticky_note_manager)
+
 	_setting_handlers = {
 		SETTING_SMART_SELECT_ENABLED: func(value): _smart_select.set_enabled(bool(value)),
 		SETTING_WIRE_CLEAR_ENABLED: func(value): _wire_clear.set_enabled(bool(value)),
@@ -546,7 +552,17 @@ func _register_commands() -> void:
 	_register_toggle_command(registry, "tajs_qol.toggle_wire_colors", "Wire Colors", SETTING_WIRE_COLORS_ENABLED, true, "res://textures/icons/connections.png", ["wire", "color", "visual"])
 	_register_toggle_command(registry, "tajs_qol.toggle_extra_glow", "Extra Glow", SETTING_GLOW_ENABLED, false, "res://textures/icons/eye_ball.png", ["glow", "bloom", "visual"])
 	_register_toggle_command(registry, "tajs_qol.toggle_group_patterns", "Group Patterns", SETTING_GROUP_PATTERNS_ENABLED, true, "res://textures/icons/grid.png", ["group", "pattern", "visual"])
+	_register_toggle_command(registry, "tajs_qol.toggle_group_patterns", "Group Patterns", SETTING_GROUP_PATTERNS_ENABLED, true, "res://textures/icons/grid.png", ["group", "pattern", "visual"])
 	_register_toggle_command(registry, "tajs_qol.toggle_boot_screen", "Boot Screen", SETTING_BOOT_SCREEN_ENABLED, false, "res://textures/icons/puzzle.png", ["boot", "startup", "visual"])
+
+	registry.register_command("tajs_qol.create_sticky_note", {
+		"title": "Create Sticky Note",
+		"description": "Create a new sticky note at camera center",
+		"category_path": ["Tools", "Notes"],
+		"keywords": ["note", "sticky", "create", "add"],
+		"icon_path": "res://textures/icons/document.png",
+		"badge": "SAFE"
+	}, Callable(self, "_on_create_sticky_note"))
 
 	registry.register_command("tajs_qol.notifications.open", {
 		"title": "Open Notification History",
@@ -797,6 +813,11 @@ func _build_settings_ui(container: VBoxContainer) -> void:
 	_setting_ui_updaters[SETTING_SCREENSHOT_FOLDER] = func(_value):
 		if _folder_label:
 			_folder_label.text = _screenshot.get_display_folder()
+
+
+func _on_create_sticky_note(_ctx = null) -> void:
+	if _sticky_note_manager:
+		_sticky_note_manager.create_note_at_camera_center()
 
 
 func _bind_toggle(ui, container: VBoxContainer, label: String, setting_key: String, default_value: bool, tooltip: String) -> void:
