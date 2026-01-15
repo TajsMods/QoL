@@ -22,7 +22,6 @@ const NotificationHistoryFeatureScript = preload("res://mods-unpacked/TajemnikTV
 const ScreenshotFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/screenshot_feature.gd")
 const WireColorsFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/wire_colors_feature.gd")
 const VisualEffectsFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/visual_effects_feature.gd")
-const BootScreenFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/boot_screen_feature.gd")
 const GroupPatternsFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/group_patterns_feature.gd")
 const CoreColorPickerPanelScript = preload("res://mods-unpacked/TajemnikTV-Core/core/ui/color_picker_panel.gd")
 
@@ -50,7 +49,6 @@ const SETTING_UI_OPACITY := "%s.ui_opacity" % SETTINGS_PREFIX
 const SETTING_GROUP_PATTERNS_ENABLED := "%s.group_patterns_enabled" % SETTINGS_PREFIX
 const SETTING_GROUP_COLOR_PICKER_ENABLED := "%s.group_color_picker_enabled" % SETTINGS_PREFIX
 const SETTING_GROUP_PATTERNS_DATA := "%s.group_patterns" % SETTINGS_PREFIX
-const SETTING_BOOT_SCREEN_ENABLED := "%s.boot_screen_enabled" % SETTINGS_PREFIX
 const SETTING_COLOR_PICKER_DATA := "%s.color_picker" % SETTINGS_PREFIX
 const SETTING_HIDE_PURCHASED_TOKENS := "%s.hide_purchased_tokens" % SETTINGS_PREFIX
 const SETTING_HIDE_MAXED_UPGRADES := "%s.hide_maxed_upgrades" % SETTINGS_PREFIX
@@ -80,8 +78,7 @@ const SETTINGS_KEYS := [
 	SETTING_UI_OPACITY,
 	SETTING_GROUP_PATTERNS_ENABLED,
 	SETTING_GROUP_COLOR_PICKER_ENABLED,
-	SETTING_GROUP_PATTERNS_DATA,
-	SETTING_BOOT_SCREEN_ENABLED
+	SETTING_GROUP_PATTERNS_DATA
 ]
 const StickyNoteManagerScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/sticky_notes/sticky_note_manager.gd")
 
@@ -100,7 +97,6 @@ var _notification_history
 var _screenshot
 var _wire_colors
 var _visual_effects
-var _boot_screen
 var _group_patterns
 
 var _hud_ready: bool = false
@@ -308,11 +304,6 @@ func _register_settings() -> void:
 			"default": {},
 			"description": "Stored group pattern settings"
 		},
-		SETTING_BOOT_SCREEN_ENABLED: {
-			"type": "bool",
-			"default": false,
-			"description": "Enable custom boot screen"
-		},
 		SETTING_COLOR_PICKER_DATA: {
 			"type": "dict",
 			"default": {},
@@ -377,9 +368,6 @@ func _init_features() -> void:
 	_visual_effects = VisualEffectsFeatureScript.new()
 	_visual_effects.setup(_core)
 
-	_boot_screen = BootScreenFeatureScript.new()
-	_boot_screen.setup(_core, _get_mod_version())
-
 	_group_patterns = GroupPatternsFeatureScript.new()
 
 	_sticky_note_manager = StickyNoteManagerScript.new()
@@ -409,10 +397,7 @@ func _init_features() -> void:
 		SETTING_GLOW_SENSITIVITY: func(value): _visual_effects.set_glow_settings(_settings.get_float(SETTING_GLOW_INTENSITY, 2.0), _settings.get_float(SETTING_GLOW_STRENGTH, 1.3), _settings.get_float(SETTING_GLOW_BLOOM, 0.2), float(value)),
 		SETTING_UI_OPACITY: func(value): _visual_effects.set_ui_opacity(float(value)),
 		SETTING_GROUP_PATTERNS_ENABLED: func(value): _group_patterns.set_enabled(bool(value)),
-		SETTING_GROUP_COLOR_PICKER_ENABLED: func(value): _group_patterns.set_color_picker_enabled(bool(value)),
-		SETTING_BOOT_SCREEN_ENABLED: func(value):
-			_boot_screen.set_enabled(bool(value))
-			_boot_screen.try_patch()
+		SETTING_GROUP_COLOR_PICKER_ENABLED: func(value): _group_patterns.set_color_picker_enabled(bool(value))
 	}
 
 
@@ -468,9 +453,8 @@ func _on_desktop_ready(_payload: Dictionary) -> void:
 		_group_patterns.set_color_picker_enabled(_settings.get_bool(SETTING_GROUP_COLOR_PICKER_ENABLED, true))
 
 
-func _on_node_added(node: Node) -> void:
-	if node.name == "Boot" and _boot_screen != null:
-		_boot_screen.try_patch()
+func _on_node_added(_node: Node) -> void:
+	pass
 
 
 func _on_hud_ready(_payload: Dictionary) -> void:
@@ -553,7 +537,6 @@ func _register_commands() -> void:
 	_register_toggle_command(registry, "tajs_qol.toggle_extra_glow", "Extra Glow", SETTING_GLOW_ENABLED, false, "res://textures/icons/eye_ball.png", ["glow", "bloom", "visual"])
 	_register_toggle_command(registry, "tajs_qol.toggle_group_patterns", "Group Patterns", SETTING_GROUP_PATTERNS_ENABLED, true, "res://textures/icons/grid.png", ["group", "pattern", "visual"])
 	_register_toggle_command(registry, "tajs_qol.toggle_group_patterns", "Group Patterns", SETTING_GROUP_PATTERNS_ENABLED, true, "res://textures/icons/grid.png", ["group", "pattern", "visual"])
-	_register_toggle_command(registry, "tajs_qol.toggle_boot_screen", "Boot Screen", SETTING_BOOT_SCREEN_ENABLED, false, "res://textures/icons/puzzle.png", ["boot", "startup", "visual"])
 
 	registry.register_command("tajs_qol.create_sticky_note", {
 		"title": "Create Sticky Note",
@@ -771,7 +754,6 @@ func _build_settings_ui(container: VBoxContainer) -> void:
 
 	_bind_toggle(ui, container, "Group Patterns & Colors", SETTING_GROUP_PATTERNS_ENABLED, true, "Enable custom group patterns and colors.")
 	_bind_toggle(ui, container, "Group Custom Color Picker", SETTING_GROUP_COLOR_PICKER_ENABLED, true, "Enable custom color picker for group nodes.")
-	_bind_toggle(ui, container, "Custom Boot Screen", SETTING_BOOT_SCREEN_ENABLED, false, "Applies on next launch.")
 
 	ui.add_separator(container)
 	ui.add_section_header(container, "Screenshots")
