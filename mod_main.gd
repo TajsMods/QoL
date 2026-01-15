@@ -154,19 +154,6 @@ func _get_core():
     return null
 
 
-func _is_wire_drop_mod_active() -> bool:
-    if not _has_global_class("ModLoaderMod"):
-        return false
-    var data = ModLoaderMod.get_mod_data("TajemnikTV-WireDrop")
-    if data == null:
-        return false
-    if data is Dictionary:
-        return bool(data.get("is_active", false))
-    if "is_active" in data:
-        return bool(data.is_active)
-    return false
-
-
 func _register_module() -> void:
     if _core.has_method("register_module"):
         _core.register_module({
@@ -340,7 +327,6 @@ func _init_features() -> void:
 
     _wire_drop = WireDropFeatureScript.new()
     _wire_drop.setup(_core)
-    _wire_drop.set_conflict_active(_is_wire_drop_mod_active())
     add_child(_wire_drop)
 
     _slider_scroll_block = SliderScrollBlockFeatureScript.new()

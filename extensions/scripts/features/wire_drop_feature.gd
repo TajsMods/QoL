@@ -13,7 +13,6 @@ var _node_filter
 var _palette_controller
 var _palette_overlay
 var _enabled: bool = true
-var _blocked_by_conflict: bool = false
 
 
 func setup(core) -> void:
@@ -37,19 +36,12 @@ func set_enabled(enabled: bool) -> void:
 
 
 func is_enabled() -> bool:
-	return _enabled and not _blocked_by_conflict
-
-
-func set_conflict_active(active: bool) -> void:
-	_blocked_by_conflict = active
-	_apply_enabled()
-	if active:
-		_notify("exclamation", "Wire Drop is disabled because TajemnikTV-WireDrop is active.")
+	return _enabled
 
 
 func _apply_enabled() -> void:
 	if _handler != null:
-		_handler.set_enabled(_enabled and not _blocked_by_conflict)
+		_handler.set_enabled(_enabled)
 
 
 func _register_events() -> void:
