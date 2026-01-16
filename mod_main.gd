@@ -129,7 +129,6 @@ func _init() -> void:
         return
     _settings = _core.settings
     _register_module()
-    _core.register_settings_tab(MOD_ID, "Taj's QoL", "res://textures/icons/puzzle.png")
     _register_settings()
     _init_features()
     _register_keybinds()
@@ -462,7 +461,7 @@ func _ensure_settings_tab() -> void:
         return
     _settings_tab = _core.get_settings_tab(MOD_ID)
     if _settings_tab == null:
-        _settings_tab = _core.register_settings_tab(MOD_ID, "Taj's QoL", "res://textures/icons/puzzle.png")
+        _settings_tab = _core.register_settings_tab(MOD_ID, "Taj's QoL", "res://mods-unpacked/TajemnikTV-Core/textures/icons/Align-Stroke-To-Center.png")
     if _settings_tab != null:
         _build_settings_ui(_settings_tab)
         _settings_ui_built = true
