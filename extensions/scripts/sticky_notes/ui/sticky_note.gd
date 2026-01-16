@@ -93,7 +93,7 @@ const OUTLINE_WIDTH = 2.0
 func _init() -> void:
     custom_minimum_size = Vector2(200, 100)
     size = Vector2(280, 140)
-    mouse_filter = Control.MOUSE_FILTER_STOP
+    mouse_filter = Control.MOUSE_FILTER_PASS # Allow scroll events to pass through for camera zoom
 
 func _ready() -> void:
     _build_ui()
@@ -106,7 +106,8 @@ func _ready() -> void:
     if _body_edit:
         _body_edit.text = body_text
     if _body_display:
-        _body_display.text = body_text
+        _body_display.clear()
+        _body_display.append_text(body_text) # Use append_text for BBCode parsing
     
     # Start in view mode
     _set_edit_mode(false)
@@ -137,7 +138,7 @@ func _build_ui() -> void:
     _title_panel.anchor_right = 1
     _title_panel.anchor_bottom = 0
     _title_panel.offset_bottom = 56
-    _title_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+    _title_panel.mouse_filter = Control.MOUSE_FILTER_PASS # Allow scroll events to pass through
     _title_panel.gui_input.connect(_on_title_panel_input)
     
     # Styling
@@ -256,9 +257,9 @@ func _build_ui() -> void:
     _body_display = RichTextLabel.new()
     _body_display.name = "BodyDisplay"
     _body_display.bbcode_enabled = true
-    _body_display.scroll_active = true
+    _body_display.scroll_active = false # Disable scroll to allow zoom passthrough
     _body_display.selection_enabled = false
-    _body_display.mouse_filter = Control.MOUSE_FILTER_STOP
+    _body_display.mouse_filter = Control.MOUSE_FILTER_PASS # Allow scroll for camera zoom
     _body_display.anchor_left = 0
     _body_display.anchor_top = 0
     _body_display.anchor_right = 1
@@ -267,7 +268,7 @@ func _build_ui() -> void:
     _body_display.offset_top = 8
     _body_display.offset_right = -8
     _body_display.offset_bottom = -8
-    _body_display.add_theme_font_size_override("normal_font_size", 14)
+    _body_display.add_theme_font_size_override("normal_font_size", 24)
     _body_display.add_theme_color_override("default_color", Color(1, 1, 1))
     # Click on RichTextLabel to enter edit mode
     _body_display.gui_input.connect(_on_view_gui_input)
@@ -285,7 +286,7 @@ func _build_ui() -> void:
     _body_edit.offset_top = 8
     _body_edit.offset_right = -8
     _body_edit.offset_bottom = -8
-    _body_edit.add_theme_font_size_override("font_size", 14)
+    _body_edit.add_theme_font_size_override("font_size", 24)
     _body_edit.add_theme_color_override("font_color", Color(1, 1, 1))
     _body_edit.add_theme_color_override("font_placeholder_color", Color(0.8, 0.8, 0.8, 0.5))
     _body_edit.add_theme_color_override("caret_color", Color(1, 1, 1))
@@ -303,6 +304,8 @@ func _build_ui() -> void:
     _body_edit.gui_input.connect(_on_body_gui_input)
     _body_edit.focus_entered.connect(func(): _set_selected(true))
     _body_edit.focus_exited.connect(_on_body_focus_exited)
+    # Note: Scrollbar mouse filter left as default so text scrolling works in edit mode
+    # Zoom forwarding is controlled by checking _is_edit_mode in input handlers
     
     _body_panel.add_child(_body_edit)
     
@@ -505,9 +508,19 @@ func _get_cursor_for_dir(dir: Vector2) -> CursorShape:
 
 # === Input Handling ===
 func _gui_input(event: InputEvent) -> void:
-    if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-        _set_selected(true)
-        accept_event()
+    # Forward scroll wheel events to camera for zoom (only when not editing)
+    if event is InputEventMouseButton:
+        if event.button_index == MOUSE_BUTTON_WHEEL_UP or event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+            if not _is_edit_mode: # Only forward scroll when not editing text
+                Signals.movement_input.emit(event, global_position)
+                accept_event()
+            return
+        if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+            _set_selected(true)
+            accept_event()
+    # Forward screen touch/drag for panning (use Vector2.ZERO for correct speed)
+    elif event is InputEventScreenTouch or event is InputEventScreenDrag:
+        Signals.movement_input.emit(event, Vector2.ZERO)
 
 func _input(event: InputEvent) -> void:
     if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
@@ -664,20 +677,26 @@ func _on_edit_cancelled() -> void:
     _edit_popup_layer.visible = false
 
 func _on_title_panel_input(event: InputEvent) -> void:
-    if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
-        if event.pressed:
-            _is_dragging = true
-            _drag_offset = get_global_mouse_position() - global_position
-            drag_started.emit()
-            _set_selected(true)
-        else:
-            if _is_dragging:
-                _is_dragging = false
-                global_position = global_position.snappedf(GRID_SIZE)
-                _update_handle_positions()
-                drag_ended.emit()
-                _emit_changed()
-        accept_event()
+    # Forward scroll wheel events to camera for zoom
+    if event is InputEventMouseButton:
+        if event.button_index == MOUSE_BUTTON_WHEEL_UP or event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+            Signals.movement_input.emit(event, global_position)
+            accept_event()
+            return
+        if event.button_index == MOUSE_BUTTON_LEFT:
+            if event.pressed:
+                _is_dragging = true
+                _drag_offset = get_global_mouse_position() - global_position
+                drag_started.emit()
+                _set_selected(true)
+            else:
+                if _is_dragging:
+                    _is_dragging = false
+                    global_position = global_position.snappedf(GRID_SIZE)
+                    _update_handle_positions()
+                    drag_ended.emit()
+                    _emit_changed()
+            accept_event()
     
     elif event is InputEventMouseMotion and _is_dragging:
         var new_pos = get_global_mouse_position() - _drag_offset
@@ -712,18 +731,26 @@ func _set_edit_mode(enabled: bool) -> void:
         _update_display_text()
 
 func _update_display_text() -> void:
-    # Basic BBCode support or just text
-    # Assuming body_text contains BBCode tags if added by context menu
-    _body_display.text = body_text
+    # Use clear + append_text for proper BBCode parsing
+    _body_display.clear()
+    _body_display.append_text(body_text)
 
 func _on_view_gui_input(event: InputEvent) -> void:
-    if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-        if event.double_click:
-            _set_edit_mode(true)
+    # Forward scroll wheel events to camera for zoom
+    if event is InputEventMouseButton:
+        if event.button_index == MOUSE_BUTTON_WHEEL_UP or event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+            Signals.movement_input.emit(event, global_position)
             accept_event()
-        else:
-            _set_selected(true)
-            # Propagate click to allow selection
+            return
+        if event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+            if event.double_click:
+                _set_edit_mode(true)
+                accept_event()
+            else:
+                _set_selected(true)
+    # Forward screen touch/drag for panning (use Vector2.ZERO for correct speed)
+    elif event is InputEventScreenTouch or event is InputEventScreenDrag:
+        Signals.movement_input.emit(event, Vector2.ZERO)
 
 func _on_body_changed() -> void:
     body_text = _body_edit.text
@@ -736,6 +763,8 @@ func _on_body_focus_exited() -> void:
     pass
 
 func _on_body_gui_input(event: InputEvent) -> void:
+    # In edit mode, don't forward scroll - let TextEdit handle text scrolling
+    # Scroll forwarding only happens when NOT in edit mode (handled by _on_view_gui_input)
     # Handle right-click for context menu
     if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT:
         if event.pressed:
@@ -744,6 +773,13 @@ func _on_body_gui_input(event: InputEvent) -> void:
         return
     
     if event is InputEventKey and event.pressed:
+        # Handle Enter key manually (game has disabled ui_text_newline action)
+        if event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER:
+            if not event.ctrl_pressed and not event.alt_pressed:
+                _body_edit.insert_text_at_caret("\n")
+                accept_event()
+                return
+        
         if event.keycode == KEY_A and event.ctrl_pressed:
             _body_edit.select_all()
             accept_event()
