@@ -22,7 +22,9 @@ const NotificationHistoryFeatureScript = preload("res://mods-unpacked/TajemnikTV
 const ScreenshotFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/screenshot_feature.gd")
 const WireColorsFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/wire_colors_feature.gd")
 const VisualEffectsFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/visual_effects_feature.gd")
+const DisconnectedHighlightFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/disconnected_highlight_feature.gd")
 const GroupPatternsFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/group_patterns_feature.gd")
+const GroupLayerFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/group_layer_feature.gd")
 const CoreColorPickerPanelScript = preload("res://mods-unpacked/TajemnikTV-Core/core/ui/color_picker_panel.gd")
 
 const SETTING_SMART_SELECT_ENABLED := "%s.smart_select_enabled" % SETTINGS_PREFIX
@@ -46,6 +48,9 @@ const SETTING_GLOW_STRENGTH := "%s.glow_strength" % SETTINGS_PREFIX
 const SETTING_GLOW_BLOOM := "%s.glow_bloom" % SETTINGS_PREFIX
 const SETTING_GLOW_SENSITIVITY := "%s.glow_sensitivity" % SETTINGS_PREFIX
 const SETTING_UI_OPACITY := "%s.ui_opacity" % SETTINGS_PREFIX
+const SETTING_HIGHLIGHT_DISCONNECTED_ENABLED := "%s.highlight_disconnected_enabled" % SETTINGS_PREFIX
+const SETTING_HIGHLIGHT_DISCONNECTED_STYLE := "%s.highlight_disconnected_style" % SETTINGS_PREFIX
+const SETTING_HIGHLIGHT_DISCONNECTED_INTENSITY := "%s.highlight_disconnected_intensity" % SETTINGS_PREFIX
 const SETTING_GROUP_PATTERNS_ENABLED := "%s.group_patterns_enabled" % SETTINGS_PREFIX
 const SETTING_GROUP_COLOR_PICKER_ENABLED := "%s.group_color_picker_enabled" % SETTINGS_PREFIX
 const SETTING_GROUP_PATTERNS_DATA := "%s.group_patterns" % SETTINGS_PREFIX
@@ -76,6 +81,9 @@ const SETTINGS_KEYS := [
     SETTING_GLOW_BLOOM,
     SETTING_GLOW_SENSITIVITY,
     SETTING_UI_OPACITY,
+    SETTING_HIGHLIGHT_DISCONNECTED_ENABLED,
+    SETTING_HIGHLIGHT_DISCONNECTED_STYLE,
+    SETTING_HIGHLIGHT_DISCONNECTED_INTENSITY,
     SETTING_GROUP_PATTERNS_ENABLED,
     SETTING_GROUP_COLOR_PICKER_ENABLED,
     SETTING_GROUP_PATTERNS_DATA
@@ -97,7 +105,9 @@ var _notification_history
 var _screenshot
 var _wire_colors
 var _visual_effects
+var _disconnected_highlight
 var _group_patterns
+var _group_layer
 
 var _hud_ready: bool = false
 var _setting_handlers: Dictionary = {}
@@ -275,6 +285,21 @@ func _register_settings() -> void:
             "default": 100.0,
             "description": "UI opacity percentage"
         },
+        SETTING_HIGHLIGHT_DISCONNECTED_ENABLED: {
+            "type": "bool",
+            "default": true,
+            "description": "Highlight windows not connected to the main graph"
+        },
+        SETTING_HIGHLIGHT_DISCONNECTED_STYLE: {
+            "type": "string",
+            "default": "pulse",
+            "description": "Highlight style (pulse or outline)"
+        },
+        SETTING_HIGHLIGHT_DISCONNECTED_INTENSITY: {
+            "type": "float",
+            "default": 0.5,
+            "description": "Highlight intensity"
+        },
         SETTING_GROUP_PATTERNS_ENABLED: {
             "type": "bool",
             "default": true,
@@ -353,7 +378,15 @@ func _init_features() -> void:
     _visual_effects = VisualEffectsFeatureScript.new()
     _visual_effects.setup(_core)
 
+    _disconnected_highlight = DisconnectedHighlightFeatureScript.new()
+    _disconnected_highlight.setup(_core)
+    add_child(_disconnected_highlight)
+
     _group_patterns = GroupPatternsFeatureScript.new()
+
+    _group_layer = GroupLayerFeatureScript.new()
+    _group_layer.setup(_core)
+    add_child(_group_layer)
 
     _sticky_note_manager = StickyNoteManagerScript.new()
     _sticky_note_manager.setup(_settings, get_tree(), self)
@@ -381,6 +414,9 @@ func _init_features() -> void:
         SETTING_GLOW_BLOOM: func(value): _visual_effects.set_glow_settings(_settings.get_float(SETTING_GLOW_INTENSITY, 2.0), _settings.get_float(SETTING_GLOW_STRENGTH, 1.3), float(value), _settings.get_float(SETTING_GLOW_SENSITIVITY, 0.8)),
         SETTING_GLOW_SENSITIVITY: func(value): _visual_effects.set_glow_settings(_settings.get_float(SETTING_GLOW_INTENSITY, 2.0), _settings.get_float(SETTING_GLOW_STRENGTH, 1.3), _settings.get_float(SETTING_GLOW_BLOOM, 0.2), float(value)),
         SETTING_UI_OPACITY: func(value): _visual_effects.set_ui_opacity(float(value)),
+        SETTING_HIGHLIGHT_DISCONNECTED_ENABLED: func(value): _disconnected_highlight.set_enabled(bool(value)),
+        SETTING_HIGHLIGHT_DISCONNECTED_STYLE: func(value): _disconnected_highlight.set_style(str(value)),
+        SETTING_HIGHLIGHT_DISCONNECTED_INTENSITY: func(value): _disconnected_highlight.set_intensity(float(value)),
         SETTING_GROUP_PATTERNS_ENABLED: func(value): _group_patterns.set_enabled(bool(value)),
         SETTING_GROUP_COLOR_PICKER_ENABLED: func(value): _group_patterns.set_color_picker_enabled(bool(value))
     }
@@ -501,6 +537,19 @@ func _register_commands() -> void:
     var registry = _core.commands if _core.commands != null else _core.command_registry
     if registry == null or _settings == null:
         return
+
+    # Register the "Taj's QoL" category so it appears on the Command Palette home screen
+    registry.register({
+        "id": "cat_tajs_qol",
+        "title": "Taj's QoL",
+        "category_path": [],
+        "keywords": ["qol", "tajs", "quality", "life", "features"],
+        "hint": "Quality of Life features and toggles",
+        "icon_path": "res://mods-unpacked/TajemnikTV-Core/textures/icons/Align-Stroke-To-Center.png",
+        "is_category": true,
+        "badge": "SAFE"
+    })
+
     registry.register_command("tajs_qol.select_all", {
         "title": "Select All Nodes",
         "description": "Select all nodes on the desktop",
@@ -519,8 +568,8 @@ func _register_commands() -> void:
     _register_toggle_command(registry, "tajs_qol.toggle_controller_block", "Disable Controller Input", SETTING_CONTROLLER_BLOCK_ENABLED, false, "res://textures/icons/controller.png", ["controller", "gamepad", "input"])
     _register_toggle_command(registry, "tajs_qol.toggle_screenshots", "Screenshot Tools", SETTING_SCREENSHOT_ENABLED, true, "res://textures/icons/image.png", ["screenshot", "capture"])
     _register_toggle_command(registry, "tajs_qol.toggle_wire_colors", "Wire Colors", SETTING_WIRE_COLORS_ENABLED, true, "res://textures/icons/connections.png", ["wire", "color", "visual"])
+    _register_toggle_command(registry, "tajs_qol.toggle_disconnected_highlight", "Disconnected Node Highlight", SETTING_HIGHLIGHT_DISCONNECTED_ENABLED, true, "res://textures/icons/eye_ball.png", ["highlight", "disconnected", "visual"])
     _register_toggle_command(registry, "tajs_qol.toggle_extra_glow", "Extra Glow", SETTING_GLOW_ENABLED, false, "res://textures/icons/eye_ball.png", ["glow", "bloom", "visual"])
-    _register_toggle_command(registry, "tajs_qol.toggle_group_patterns", "Group Patterns", SETTING_GROUP_PATTERNS_ENABLED, true, "res://textures/icons/grid.png", ["group", "pattern", "visual"])
     _register_toggle_command(registry, "tajs_qol.toggle_group_patterns", "Group Patterns", SETTING_GROUP_PATTERNS_ENABLED, true, "res://textures/icons/grid.png", ["group", "pattern", "visual"])
 
     registry.register_command("tajs_qol.create_sticky_note", {
@@ -602,7 +651,7 @@ func _format_toggle_title(label: String, setting_key: String, default_value: boo
     return "%s [%s]" % [label, "ON" if enabled else "OFF"]
 
 
-func _toggle_setting_command(setting_key: String, default_value: bool, _ctx = null) -> void:
+func _toggle_setting_command(_ctx, setting_key: String, default_value: bool) -> void:
     _toggle_setting(setting_key, default_value)
 
 
@@ -712,6 +761,23 @@ func _build_settings_ui(container: VBoxContainer) -> void:
                     style.bg_color = color
                 if btn and is_instance_valid(btn):
                     btn.queue_redraw()
+
+    var highlight_section = ui.add_collapsible_section(container, "Disconnected Node Highlight", false)
+    _bind_toggle(ui, highlight_section, "Enable Highlighting", SETTING_HIGHLIGHT_DISCONNECTED_ENABLED, true, "Highlight windows that are not connected to the main graph.")
+    var style_value = _settings.get_string(SETTING_HIGHLIGHT_DISCONNECTED_STYLE, "pulse")
+    var style_selected = 1 if style_value == "outline" else 0
+    var style_dropdown = ui.add_dropdown(highlight_section, "Highlight Style", ["Pulse Tint", "Outline Tint"], style_selected, func(idx):
+        var next_style = "outline" if idx == 1 else "pulse"
+        _settings.set_value(SETTING_HIGHLIGHT_DISCONNECTED_STYLE, next_style)
+    )
+    _setting_ui_updaters[SETTING_HIGHLIGHT_DISCONNECTED_STYLE] = func(value):
+        var selected = 1 if str(value) == "outline" else 0
+        style_dropdown.selected = selected
+    var intensity_slider = ui.add_slider(highlight_section, "Intensity", _settings.get_float(SETTING_HIGHLIGHT_DISCONNECTED_INTENSITY, 0.5) * 100.0, 0.0, 100.0, 5.0, "%", func(v):
+        _settings.set_value(SETTING_HIGHLIGHT_DISCONNECTED_INTENSITY, v / 100.0)
+    )
+    _setting_ui_updaters[SETTING_HIGHLIGHT_DISCONNECTED_INTENSITY] = func(value):
+        intensity_slider.value = float(value) * 100.0
 
     var glow_container = ui.add_collapsible_section(container, "Extra Glow", false)
     _bind_toggle(ui, glow_container, "Enable Extra Glow", SETTING_GLOW_ENABLED, false, "Boost glow/bloom intensity.")

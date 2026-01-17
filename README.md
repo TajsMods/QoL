@@ -12,7 +12,7 @@ Quality-of-life utilities for Upload Labs, refactored to use Taj's Core services
 - Toast History panel with configurable length and clear button
 - Disable Controller Input toggle
 - Smart Screenshots (full board + selection capture, tiled/HQ)
-- Visual tweaks: wire colors, extra glow/bloom, UI opacity, group patterns/colors, custom boot screen
+- Visual tweaks: wire colors, disconnected node highlight, extra glow/bloom, UI opacity, group patterns/colors, custom boot screen
 
 ## Commands and Keybinds
 
@@ -59,7 +59,7 @@ These were intentionally left out to avoid overlaps, cheats, or gameplay tweaks.
 | Smooth Scrolling | `mods-unpacked/mods disabled/TajemnikTV-TajsModded/extensions/scripts/utilities/smooth_scroll_manager.gd` | QoL | No | Optional QoL; excluded to keep scope tight |
 | Disable Slider Scroll | `mods-unpacked/mods disabled/TajemnikTV-TajsModded/mod_main.gd` | QoL | Yes | `mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/slider_scroll_block_feature.gd` (Core settings) |
 | Group Z-Order Fix | `mods-unpacked/mods disabled/TajemnikTV-TajsModded/extensions/scripts/utilities/node_group_z_order_fix.gd` | Visual | No | Visual tweak (out of QoL scope) |
-| Disconnected Node Highlighter | `mods-unpacked/mods disabled/TajemnikTV-TajsModded/extensions/scripts/utilities/disconnected_node_highlighter.gd` | Visual | No | Visual-only |
+| Disconnected Node Highlighter | `mods-unpacked/mods disabled/TajemnikTV-TajsModded/extensions/scripts/utilities/disconnected_node_highlighter.gd` | Visual | Yes | `mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/disconnected_highlight_feature.gd` + `mods-unpacked/TajemnikTV-Core/core/util/connectivity_helpers.gd` (Core settings + connectivity helpers) |
 | Wire Colors | `mods-unpacked/mods disabled/TajemnikTV-TajsModded/extensions/scripts/utilities/wire_color_overrides.gd` | Visual | Yes | `mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/wire_colors_feature.gd` (Core settings + UI) |
 | Group Node Patterns | `mods-unpacked/mods disabled/TajemnikTV-TajsModded/extensions/scripts/ui/pattern_*` + `mods-unpacked/mods disabled/TajemnikTV-TajsModded/extensions/scenes/windows/window_group.gd` | Visual | Yes | `mods-unpacked/TajemnikTV-QoL/extensions/scenes/windows/window_group.gd` + `mods-unpacked/TajemnikTV-QoL/extensions/scripts/ui/pattern_*` (Core settings) |
 | UI Opacity | `mods-unpacked/mods disabled/TajemnikTV-TajsModded/mod_settings.gd` | Visual | Yes | `mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/visual_effects_feature.gd` (Core settings) |
