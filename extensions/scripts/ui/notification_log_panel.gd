@@ -166,16 +166,16 @@ func _close_popup() -> void:
 func _position_popup() -> void:
 	await get_tree().process_frame
 	var btn_global = toggle_btn.global_position
-	var btn_size = toggle_btn.size
 	var popup_size = popup_panel.size
-	popup_panel.global_position = Vector2(btn_global.x, btn_global.y + btn_size.y + 8)
 	var viewport_size = get_viewport().get_visible_rect().size
+	# Position at the top of the screen with a small margin
+	popup_panel.global_position = Vector2(btn_global.x, 0)
+	# Ensure popup doesn't go off the right edge
 	if popup_panel.global_position.x + popup_size.x > viewport_size.x - 10:
 		popup_panel.global_position.x = viewport_size.x - popup_size.x - 10
+	# Ensure popup doesn't go off the left edge
 	if popup_panel.global_position.x < 10:
 		popup_panel.global_position.x = 10
-	if popup_panel.global_position.y + popup_size.y > viewport_size.y - 10:
-		popup_panel.global_position.y = btn_global.y - popup_size.y - 8
 
 
 func add_notification(icon: String, text: String) -> void:
