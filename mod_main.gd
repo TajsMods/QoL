@@ -23,6 +23,7 @@ const ScreenshotFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/exte
 const WireColorsFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/wire_colors_feature.gd")
 const VisualEffectsFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/visual_effects_feature.gd")
 const DisconnectedHighlightFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/disconnected_highlight_feature.gd")
+const BreachThreatFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/breach_threat_feature.gd")
 const GroupPatternsFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/group_patterns_feature.gd")
 const GroupLayerFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/group_layer_feature.gd")
 const CoreColorPickerPanelScript = preload("res://mods-unpacked/TajemnikTV-Core/core/ui/color_picker_panel.gd")
@@ -31,6 +32,11 @@ const SETTING_SMART_SELECT_ENABLED := "%s.smart_select_enabled" % SETTINGS_PREFI
 const SETTING_WIRE_CLEAR_ENABLED := "%s.wire_clear_enabled" % SETTINGS_PREFIX
 const SETTING_WIRE_DROP_ENABLED := "%s.wire_drop_enabled" % SETTINGS_PREFIX
 const SETTING_DISABLE_SLIDER_SCROLL := "%s.disable_slider_scroll" % SETTINGS_PREFIX
+const SETTING_BREACH_ESCALATION_ENABLED := "%s.breach_escalation_enabled" % SETTINGS_PREFIX
+const SETTING_BREACH_ESCALATION_THRESHOLD := "%s.breach_escalation_threshold" % SETTINGS_PREFIX
+const SETTING_BREACH_DEESCALATION_ENABLED := "%s.breach_deescalation_enabled" % SETTINGS_PREFIX
+const SETTING_BREACH_DEESCALATION_THRESHOLD := "%s.breach_deescalation_threshold" % SETTINGS_PREFIX
+const SETTING_BREACH_ESCALATION_COOLDOWN := "%s.breach_escalation_cooldown" % SETTINGS_PREFIX
 const SETTING_FOCUS_MUTE_ENABLED := "%s.focus_mute_enabled" % SETTINGS_PREFIX
 const SETTING_FOCUS_BG_VOLUME := "%s.focus_background_volume" % SETTINGS_PREFIX
 const SETTING_NOTIFICATION_HISTORY_ENABLED := "%s.notification_history_enabled" % SETTINGS_PREFIX
@@ -64,6 +70,11 @@ const SETTINGS_KEYS := [
     SETTING_WIRE_CLEAR_ENABLED,
     SETTING_WIRE_DROP_ENABLED,
     SETTING_DISABLE_SLIDER_SCROLL,
+    SETTING_BREACH_ESCALATION_ENABLED,
+    SETTING_BREACH_ESCALATION_THRESHOLD,
+    SETTING_BREACH_DEESCALATION_ENABLED,
+    SETTING_BREACH_DEESCALATION_THRESHOLD,
+    SETTING_BREACH_ESCALATION_COOLDOWN,
     SETTING_FOCUS_MUTE_ENABLED,
     SETTING_FOCUS_BG_VOLUME,
     SETTING_NOTIFICATION_HISTORY_ENABLED,
@@ -106,6 +117,7 @@ var _screenshot
 var _wire_colors
 var _visual_effects
 var _disconnected_highlight
+var _breach_threat
 var _group_patterns
 var _group_layer
 
@@ -130,6 +142,7 @@ func _init() -> void:
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/upgrades_tab.gd")
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/request_panel.gd")
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/requests_tab.gd")
+        ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/window_breach.gd")
     _core = _get_core()
     if _core == null:
         _log_warn("Taj's Core not found; QoL disabled.")
@@ -199,6 +212,31 @@ func _register_settings() -> void:
             "type": "bool",
             "default": false,
             "description": "Disable mouse wheel changes on sliders"
+        },
+        SETTING_BREACH_ESCALATION_ENABLED: {
+            "type": "bool",
+            "default": true,
+            "description": "Auto-adjust breach threat level after consecutive successes/failures"
+        },
+        SETTING_BREACH_ESCALATION_THRESHOLD: {
+            "type": "int",
+            "default": 3,
+            "description": "Successful breaches required before escalating threat level"
+        },
+        SETTING_BREACH_DEESCALATION_ENABLED: {
+            "type": "bool",
+            "default": true,
+            "description": "Auto-decrease breach threat level after consecutive failures"
+        },
+        SETTING_BREACH_DEESCALATION_THRESHOLD: {
+            "type": "int",
+            "default": 5,
+            "description": "Failed breaches required before de-escalating threat level"
+        },
+        SETTING_BREACH_ESCALATION_COOLDOWN: {
+            "type": "int",
+            "default": 10,
+            "description": "Successful breaches to wait after de-escalation before escalating again"
         },
         SETTING_FOCUS_MUTE_ENABLED: {
             "type": "bool",
@@ -382,6 +420,12 @@ func _init_features() -> void:
     _disconnected_highlight.setup(_core)
     add_child(_disconnected_highlight)
 
+    _breach_threat = BreachThreatFeatureScript.new()
+    _breach_threat.setup(_core)
+    add_child(_breach_threat)
+    if _core != null and _core.has_method("extend_globals"):
+        _core.extend_globals("breach_threat_manager", _breach_threat)
+
     _group_patterns = GroupPatternsFeatureScript.new()
 
     _group_layer = GroupLayerFeatureScript.new()
@@ -397,6 +441,11 @@ func _init_features() -> void:
         SETTING_WIRE_CLEAR_ENABLED: func(value): _wire_clear.set_enabled(bool(value)),
         SETTING_WIRE_DROP_ENABLED: func(value): _wire_drop.set_enabled(bool(value)),
         SETTING_DISABLE_SLIDER_SCROLL: func(value): _slider_scroll_block.set_enabled(bool(value)),
+        SETTING_BREACH_ESCALATION_ENABLED: func(value): _breach_threat.set_enabled(bool(value)),
+        SETTING_BREACH_ESCALATION_THRESHOLD: func(value): _breach_threat.set_threshold(int(value)),
+        SETTING_BREACH_DEESCALATION_ENABLED: func(value): _breach_threat.set_deescalation_enabled(bool(value)),
+        SETTING_BREACH_DEESCALATION_THRESHOLD: func(value): _breach_threat.set_deescalation_threshold(int(value)),
+        SETTING_BREACH_ESCALATION_COOLDOWN: func(value): _breach_threat.set_escalation_cooldown(int(value)),
         SETTING_FOCUS_MUTE_ENABLED: func(value): _focus_mute.set_enabled(bool(value)),
         SETTING_FOCUS_BG_VOLUME: func(value): _focus_mute.set_background_volume(float(value)),
         SETTING_NOTIFICATION_HISTORY_ENABLED: func(value): _notification_history.set_enabled(bool(value)),
@@ -687,6 +736,26 @@ func _build_settings_ui(container: VBoxContainer) -> void:
     _setting_ui_updaters[SETTING_NOTIFICATION_HISTORY_MAX] = func(value): max_slider.value = int(value)
 
     _bind_toggle(ui, container, "Disable Controller Input", SETTING_CONTROLLER_BLOCK_ENABLED, false, "Block all controller/joypad input.")
+
+    ui.add_separator(container)
+    ui.add_section_header(container, "Breach Threat")
+
+    _bind_toggle(ui, container, "Auto Threat Adjustment", SETTING_BREACH_ESCALATION_ENABLED, true, "Automatically adjust breach threat level based on consecutive successes/failures.")
+    var escalation_slider = ui.add_slider(container, "Escalation Threshold (Successes)", _settings.get_int(SETTING_BREACH_ESCALATION_THRESHOLD, 3), 1, 15, 1, "", func(v):
+        _settings.set_value(SETTING_BREACH_ESCALATION_THRESHOLD, int(v))
+    )
+    _setting_ui_updaters[SETTING_BREACH_ESCALATION_THRESHOLD] = func(value): escalation_slider.value = int(value)
+
+    _bind_toggle(ui, container, "Auto De-escalation", SETTING_BREACH_DEESCALATION_ENABLED, true, "Reduce threat level after consecutive failed breaches.")
+    var deesc_slider = ui.add_slider(container, "De-escalation Threshold (Failures)", _settings.get_int(SETTING_BREACH_DEESCALATION_THRESHOLD, 5), 1, 15, 1, "", func(v):
+        _settings.set_value(SETTING_BREACH_DEESCALATION_THRESHOLD, int(v))
+    )
+    _setting_ui_updaters[SETTING_BREACH_DEESCALATION_THRESHOLD] = func(value): deesc_slider.value = int(value)
+
+    var cooldown_slider = ui.add_slider(container, "Escalation Cooldown (Successes)", _settings.get_int(SETTING_BREACH_ESCALATION_COOLDOWN, 10), 0, 30, 1, "", func(v):
+        _settings.set_value(SETTING_BREACH_ESCALATION_COOLDOWN, int(v))
+    )
+    _setting_ui_updaters[SETTING_BREACH_ESCALATION_COOLDOWN] = func(value): cooldown_slider.value = int(value)
 
     ui.add_separator(container)
     ui.add_section_header(container, "Visuals")

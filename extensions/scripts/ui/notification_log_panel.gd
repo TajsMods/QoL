@@ -32,14 +32,14 @@ func set_max_notifications(value: int) -> void:
 
 func _build_ui() -> void:
 	name = "NotificationLogPanel"
-	custom_minimum_size = Vector2(50, 50)
-	size_flags_horizontal = Control.SIZE_SHRINK_END
-	size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	custom_minimum_size = Vector2(80, 80)
+	size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	size_flags_vertical = Control.SIZE_SHRINK_CENTER
 
 	toggle_btn = Button.new()
 	toggle_btn.name = "NotificationLogButton"
-	toggle_btn.custom_minimum_size = Vector2(50, 50)
-	toggle_btn.size_flags_horizontal = Control.SIZE_SHRINK_END
+	toggle_btn.custom_minimum_size = Vector2(80, 80)
+	toggle_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER | Control.SIZE_EXPAND
 	toggle_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	toggle_btn.focus_mode = Control.FOCUS_NONE
 	toggle_btn.theme_type_variation = "ButtonMenu"
@@ -47,7 +47,6 @@ func _build_ui() -> void:
 	toggle_btn.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	toggle_btn.expand_icon = true
 	toggle_btn.tooltip_text = "Notification History"
-	toggle_btn.add_theme_constant_override("icon_max_width", 28)
 	toggle_btn.pressed.connect(_on_toggle_pressed)
 	add_child(toggle_btn)
 

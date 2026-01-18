@@ -40,7 +40,15 @@ func on_hud_ready() -> void:
 	_panel = NotificationLogPanelScript.new()
 	_panel.call("set_max_notifications", _max_entries)
 	_panel.visible = _enabled
-	_core.ui_manager.inject_hud_widget(TajsCoreHudInjector.HudZone.TOP_RIGHT, _panel, 10)
+	# Add to ExtrasButtons container (same as Puzzle/Core button) so they appear side by side
+	var extras_container = _get_extras_container()
+	if extras_container != null:
+		extras_container.add_child(_panel)
+		# Move to position 1 (after the Puzzle button at index 0)
+		extras_container.move_child(_panel, 1)
+	else:
+		# Fallback to HUD zone if container not found
+		_core.ui_manager.inject_hud_widget(TajsCoreHudInjector.HudZone.TOP_RIGHT, _panel, 10)
 	if not _pending.is_empty():
 		for entry in _pending:
 			_panel.call("add_notification", entry.get("icon", ""), entry.get("text", ""))
@@ -76,3 +84,12 @@ func _on_notification(icon: String, text: String) -> void:
 		_panel.call("add_notification", icon, text)
 	else:
 		_pending.append({"icon": icon, "text": text})
+
+
+func _get_extras_container() -> Node:
+	if Engine.get_main_loop() == null:
+		return null
+	var root = Engine.get_main_loop().root
+	if root == null:
+		return null
+	return root.get_node_or_null("Main/HUD/Main/MainContainer/Overlay/ExtrasButtons/Container")

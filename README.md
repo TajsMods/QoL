@@ -11,6 +11,7 @@ Quality-of-life utilities for Upload Labs, refactored to use Taj's Core services
 - Mute on Focus Loss with background volume slider
 - Toast History panel with configurable length and clear button
 - Disable Controller Input toggle
+- Breach threat auto-adjustment (auto up/down with cooldown)
 - Smart Screenshots (full board + selection capture, tiled/HQ)
 - Visual tweaks: wire colors, disconnected node highlight, extra glow/bloom, UI opacity, group patterns/colors, custom boot screen
 
@@ -71,7 +72,7 @@ These were intentionally left out to avoid overlaps, cheats, or gameplay tweaks.
 | Upgrade Multiplier / Modifier Keys | `mods-unpacked/mods disabled/TajemnikTV-TajsModded/extensions/scripts/utilities/upgrade_manager.gd` | Gameplay tweak | No | Progression/balance impact |
 | Node Limit Control | `mods-unpacked/mods disabled/TajemnikTV-TajsModded/mod_main.gd` | Cheat | No | Explicitly excluded |
 | Cheats Panel | `mods-unpacked/mods disabled/TajemnikTV-TajsModded/extensions/scripts/utilities/cheat_manager.gd` | Cheat | No | Explicitly excluded |
-| Breach Threat Escalation | `mods-unpacked/mods disabled/TajemnikTV-TajsModded/extensions/scripts/utilities/breach_threat_manager.gd` | Gameplay tweak | No | Progression/balance impact |
+| Breach Threat Escalation | `mods-unpacked/mods disabled/TajemnikTV-TajsModded/extensions/scripts/utilities/breach_threat_manager.gd` | Gameplay tweak | Yes | `mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/breach_threat_feature.gd` + `mods-unpacked/TajemnikTV-QoL/extensions/scripts/window_breach.gd` (Core settings + extended globals) |
 | Expanded Workspace | `mods-unpacked/mods disabled/TajemnikTV-TajsModded/extensions/scripts/utilities/workspace_bounds.gd` | Gameplay tweak | No | Progression/balance impact |
 | Extended Caps | `mods-unpacked/mods disabled/TajemnikTV-TajsModded/extensions/scripts/mechanics/extended_caps_manager.gd` | Gameplay tweak | No | Progression/balance impact |
 | Workshop Sync / Mod Manager | `mods-unpacked/mods disabled/TajemnikTV-TajsModded/extensions/scripts/utilities/workshop_sync.gd` | Tool | No | Handled by Core services |

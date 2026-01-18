@@ -1,11 +1,12 @@
 # ==============================================================================
-# Group Layer Feature
+# Taj's QoL - Group Layer Feature
 # Manages reparenting of group windows to a dedicated layer that renders
 # below wires/connectors, fixing the visual issue where groups obscure wires.
+# Author: TajemnikTV
 # ==============================================================================
 extends Node
 
-const LOG_NAME := "TajemnikTV-QoL:GroupLayer"
+const LOG_NAME := "QoL:GroupLayer"
 const LAYER_ID := "qol_groups"
 
 var _core
