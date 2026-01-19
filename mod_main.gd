@@ -46,8 +46,13 @@ const SETTING_SCREENSHOT_ENABLED := "%s.screenshot_enabled" % SETTINGS_PREFIX
 const SETTING_SCREENSHOT_QUALITY := "%s.screenshot_quality" % SETTINGS_PREFIX
 const SETTING_SCREENSHOT_FOLDER := "%s.screenshot_folder" % SETTINGS_PREFIX
 const SETTING_SCREENSHOT_WATERMARK := "%s.screenshot_watermark" % SETTINGS_PREFIX
+const ACTION_SCREENSHOT_FULL := "%s.screenshot_action_full" % SETTINGS_PREFIX
+const ACTION_SCREENSHOT_SELECTION := "%s.screenshot_action_selection" % SETTINGS_PREFIX
+const ACTION_SCREENSHOT_OPEN_FOLDER := "%s.screenshot_action_open_folder" % SETTINGS_PREFIX
+const ACTION_SCREENSHOT_CHANGE_FOLDER := "%s.screenshot_action_change_folder" % SETTINGS_PREFIX
 const SETTING_WIRE_COLORS_ENABLED := "%s.wire_colors_enabled" % SETTINGS_PREFIX
 const SETTING_WIRE_COLORS_HEX := "%s.wire_colors_hex" % SETTINGS_PREFIX
+const ACTION_RESET_WIRE_COLORS := "%s.wire_colors_reset" % SETTINGS_PREFIX
 const SETTING_GLOW_ENABLED := "%s.glow_enabled" % SETTINGS_PREFIX
 const SETTING_GLOW_INTENSITY := "%s.glow_intensity" % SETTINGS_PREFIX
 const SETTING_GLOW_STRENGTH := "%s.glow_strength" % SETTINGS_PREFIX
@@ -165,7 +170,7 @@ func _ready() -> void:
         _screenshot.set_tree(get_tree())
     if _wire_colors != null:
         _wire_colors.set_tree(get_tree())
-    call_deferred("_ensure_settings_tab")
+    # Settings UI is auto-generated from schema in Core.
 
 
 func _get_core():
@@ -196,185 +201,367 @@ func _register_settings() -> void:
         SETTING_SMART_SELECT_ENABLED: {
             "type": "bool",
             "default": true,
-            "description": "Enable Ctrl+A smart selection"
+            "label": "Smart Selection (Ctrl+A)",
+            "description": "Select all nodes on the desktop with Ctrl+A.",
+            "category": "Quality of Life"
         },
         SETTING_WIRE_CLEAR_ENABLED: {
             "type": "bool",
             "default": true,
-            "description": "Right-click connectors to clear wires"
+            "label": "Right-click Wire Clear",
+            "description": "Right-click connectors to disconnect wires.",
+            "category": "Quality of Life"
         },
         SETTING_WIRE_DROP_ENABLED: {
             "type": "bool",
             "default": true,
-            "description": "Show a node picker when wires are dropped on empty canvas"
+            "label": "Wire Drop Menu",
+            "description": "Show a node picker when wires are dropped on empty canvas.",
+            "category": "Quality of Life"
         },
         SETTING_DISABLE_SLIDER_SCROLL: {
             "type": "bool",
             "default": false,
-            "description": "Disable mouse wheel changes on sliders"
+            "label": "Disable Slider Scroll",
+            "description": "Prevent mouse wheel from changing slider values.",
+            "category": "Input"
         },
         SETTING_BREACH_ESCALATION_ENABLED: {
             "type": "bool",
             "default": true,
-            "description": "Auto-adjust breach threat level after consecutive successes/failures"
+            "label": "Auto Threat Adjustment",
+            "description": "Automatically adjust breach threat level after consecutive successes/failures.",
+            "category": "Breach Threat"
         },
         SETTING_BREACH_ESCALATION_THRESHOLD: {
             "type": "int",
             "default": 3,
-            "description": "Successful breaches required before escalating threat level"
+            "label": "Escalation Threshold (Successes)",
+            "description": "Successful breaches required before escalating threat level.",
+            "category": "Breach Threat",
+            "min": 1,
+            "max": 15,
+            "step": 1,
+            "depends_on": {"key": SETTING_BREACH_ESCALATION_ENABLED, "equals": true}
         },
         SETTING_BREACH_DEESCALATION_ENABLED: {
             "type": "bool",
             "default": true,
-            "description": "Auto-decrease breach threat level after consecutive failures"
+            "label": "Auto De-escalation",
+            "description": "Auto-decrease breach threat level after consecutive failures.",
+            "category": "Breach Threat"
         },
         SETTING_BREACH_DEESCALATION_THRESHOLD: {
             "type": "int",
             "default": 5,
-            "description": "Failed breaches required before de-escalating threat level"
+            "label": "De-escalation Threshold (Failures)",
+            "description": "Failed breaches required before de-escalating threat level.",
+            "category": "Breach Threat",
+            "min": 1,
+            "max": 15,
+            "step": 1,
+            "depends_on": {"key": SETTING_BREACH_DEESCALATION_ENABLED, "equals": true}
         },
         SETTING_BREACH_ESCALATION_COOLDOWN: {
             "type": "int",
             "default": 10,
-            "description": "Successful breaches to wait after de-escalation before escalating again"
+            "label": "Escalation Cooldown (Successes)",
+            "description": "Successful breaches to wait after de-escalation before escalating again.",
+            "category": "Breach Threat",
+            "min": 0,
+            "max": 30,
+            "step": 1,
+            "depends_on": {"key": SETTING_BREACH_ESCALATION_ENABLED, "equals": true}
         },
         SETTING_FOCUS_MUTE_ENABLED: {
             "type": "bool",
             "default": true,
-            "description": "Mute or reduce volume when game loses focus"
+            "label": "Mute on Focus Loss",
+            "description": "Lower volume when the game loses focus.",
+            "category": "Audio"
         },
         SETTING_FOCUS_BG_VOLUME: {
             "type": "float",
             "default": 0.0,
-            "description": "Background volume percentage"
+            "label": "Background Volume",
+            "description": "Background volume percentage.",
+            "category": "Audio",
+            "min": 0.0,
+            "max": 100.0,
+            "step": 5.0,
+            "depends_on": {"key": SETTING_FOCUS_MUTE_ENABLED, "equals": true}
         },
         SETTING_NOTIFICATION_HISTORY_ENABLED: {
             "type": "bool",
             "default": true,
-            "description": "Show toast history panel"
+            "label": "Toast History Panel",
+            "description": "Show a notification history panel in the HUD.",
+            "category": "Notifications"
         },
         SETTING_NOTIFICATION_HISTORY_MAX: {
             "type": "int",
             "default": 20,
-            "description": "Max toast history items"
+            "label": "Toast History Length",
+            "description": "Maximum toast history items.",
+            "category": "Notifications",
+            "min": 5,
+            "max": 100,
+            "step": 5,
+            "depends_on": {"key": SETTING_NOTIFICATION_HISTORY_ENABLED, "equals": true}
         },
         SETTING_CONTROLLER_BLOCK_ENABLED: {
             "type": "bool",
             "default": false,
-            "description": "Disable controller input"
+            "label": "Disable Controller Input",
+            "description": "Block all controller/joypad input.",
+            "category": "Input"
         },
         SETTING_SCREENSHOT_ENABLED: {
             "type": "bool",
             "default": true,
-            "description": "Enable HQ screenshot tools"
+            "label": "Screenshot Tools",
+            "description": "Enable HQ/tiled screenshot tools.",
+            "category": "Screenshots"
         },
         SETTING_SCREENSHOT_QUALITY: {
-            "type": "int",
+            "type": "enum",
             "default": 2,
-            "description": "Screenshot quality preset"
+            "label": "Screenshot Quality",
+            "description": "Screenshot quality preset.",
+            "category": "Screenshots",
+            "options": [
+                {"label": "Low (JPG)", "value": 0},
+                {"label": "Medium (JPG)", "value": 1},
+                {"label": "High (PNG)", "value": 2},
+                {"label": "Original (PNG)", "value": 3}
+            ],
+            "depends_on": {"key": SETTING_SCREENSHOT_ENABLED, "equals": true}
         },
         SETTING_SCREENSHOT_FOLDER: {
             "type": "string",
             "default": "user://screenshots",
-            "description": "Screenshot output folder"
+            "label": "Screenshot Folder",
+            "description": "Screenshot output folder.",
+            "category": "Screenshots",
+            "depends_on": {"key": SETTING_SCREENSHOT_ENABLED, "equals": true}
         },
         SETTING_SCREENSHOT_WATERMARK: {
             "type": "bool",
             "default": false,
-            "description": "Include watermark on screenshots"
+            "label": "Screenshot Watermark",
+            "description": "Include a watermark on screenshots when available.",
+            "category": "Screenshots",
+            "depends_on": {"key": SETTING_SCREENSHOT_ENABLED, "equals": true}
+        },
+        ACTION_SCREENSHOT_FULL: {
+            "type": "action",
+            "default": false,
+            "label": "Take Full Screenshot",
+            "description": "Capture a full desktop screenshot.",
+            "category": "Screenshots",
+            "action": Callable(self, "_on_screenshot_full"),
+            "depends_on": {"key": SETTING_SCREENSHOT_ENABLED, "equals": true}
+        },
+        ACTION_SCREENSHOT_SELECTION: {
+            "type": "action",
+            "default": false,
+            "label": "Capture Selection",
+            "description": "Capture only selected nodes.",
+            "category": "Screenshots",
+            "action": Callable(self, "_on_screenshot_selection"),
+            "depends_on": {"key": SETTING_SCREENSHOT_ENABLED, "equals": true}
+        },
+        ACTION_SCREENSHOT_OPEN_FOLDER: {
+            "type": "action",
+            "default": false,
+            "label": "Open Screenshot Folder",
+            "description": "Open the screenshot folder in your file explorer.",
+            "category": "Screenshots",
+            "action": Callable(self, "_on_screenshot_folder")
+        },
+        ACTION_SCREENSHOT_CHANGE_FOLDER: {
+            "type": "action",
+            "default": false,
+            "label": "Change Screenshot Folder",
+            "description": "Choose a new screenshot output folder.",
+            "category": "Screenshots",
+            "action": Callable(self, "_change_screenshot_folder"),
+            "depends_on": {"key": SETTING_SCREENSHOT_ENABLED, "equals": true}
         },
         SETTING_WIRE_COLORS_ENABLED: {
             "type": "bool",
             "default": true,
-            "description": "Enable custom wire colors"
+            "label": "Wire Color Overrides",
+            "description": "Enable custom wire colors per resource.",
+            "category": "Visuals"
         },
         SETTING_WIRE_COLORS_HEX: {
             "type": "dict",
             "default": {},
-            "description": "Custom wire colors"
+            "label": "Wire Color Overrides",
+            "description": "Custom wire colors for each resource.",
+            "category": "Visuals",
+            "ui_control": "color_map",
+            "color_options": WireColorsFeatureScript.CONFIGURABLE_WIRES,
+            "color_get": Callable(self, "_get_wire_color"),
+            "depends_on": {"key": SETTING_WIRE_COLORS_ENABLED, "equals": true}
+        },
+        ACTION_RESET_WIRE_COLORS: {
+            "type": "action",
+            "default": false,
+            "label": "Reset Wire Colors",
+            "description": "Reset all custom wire colors.",
+            "category": "Visuals",
+            "action": Callable(self, "_reset_wire_colors"),
+            "depends_on": {"key": SETTING_WIRE_COLORS_ENABLED, "equals": true}
         },
         SETTING_GLOW_ENABLED: {
             "type": "bool",
             "default": false,
-            "description": "Enable extra glow effects"
+            "label": "Enable Extra Glow",
+            "description": "Boost glow/bloom intensity.",
+            "category": "Visuals"
         },
         SETTING_GLOW_INTENSITY: {
             "type": "float",
             "default": 2.0,
-            "description": "Glow intensity"
+            "label": "Glow Intensity",
+            "description": "Glow intensity.",
+            "category": "Visuals",
+            "min": 0.0,
+            "max": 5.0,
+            "step": 0.1,
+            "depends_on": {"key": SETTING_GLOW_ENABLED, "equals": true}
         },
         SETTING_GLOW_STRENGTH: {
             "type": "float",
             "default": 1.3,
-            "description": "Glow strength"
+            "label": "Glow Strength",
+            "description": "Glow strength.",
+            "category": "Visuals",
+            "min": 0.5,
+            "max": 2.0,
+            "step": 0.05,
+            "depends_on": {"key": SETTING_GLOW_ENABLED, "equals": true}
         },
         SETTING_GLOW_BLOOM: {
             "type": "float",
             "default": 0.2,
-            "description": "Glow bloom"
+            "label": "Glow Bloom",
+            "description": "Glow bloom.",
+            "category": "Visuals",
+            "min": 0.0,
+            "max": 0.5,
+            "step": 0.05,
+            "depends_on": {"key": SETTING_GLOW_ENABLED, "equals": true}
         },
         SETTING_GLOW_SENSITIVITY: {
             "type": "float",
             "default": 0.8,
-            "description": "Glow sensitivity"
+            "label": "Glow Sensitivity",
+            "description": "Glow sensitivity.",
+            "category": "Visuals",
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.05,
+            "depends_on": {"key": SETTING_GLOW_ENABLED, "equals": true}
         },
         SETTING_UI_OPACITY: {
             "type": "float",
             "default": 100.0,
-            "description": "UI opacity percentage"
+            "label": "UI Opacity",
+            "description": "UI opacity percentage.",
+            "category": "Visuals",
+            "min": 50.0,
+            "max": 100.0,
+            "step": 5.0,
+            "ui_control": "input"
         },
         SETTING_HIGHLIGHT_DISCONNECTED_ENABLED: {
             "type": "bool",
             "default": true,
-            "description": "Highlight windows not connected to the main graph"
+            "label": "Disconnected Highlighting",
+            "description": "Highlight windows not connected to the main graph.",
+            "category": "Visuals"
         },
         SETTING_HIGHLIGHT_DISCONNECTED_STYLE: {
-            "type": "string",
+            "type": "enum",
             "default": "pulse",
-            "description": "Highlight style (pulse or outline)"
+            "label": "Highlight Style",
+            "description": "Highlight style for disconnected windows.",
+            "category": "Visuals",
+            "options": [
+                {"label": "Pulse Tint", "value": "pulse"},
+                {"label": "Outline Tint", "value": "outline"}
+            ],
+            "depends_on": {"key": SETTING_HIGHLIGHT_DISCONNECTED_ENABLED, "equals": true}
         },
         SETTING_HIGHLIGHT_DISCONNECTED_INTENSITY: {
             "type": "float",
             "default": 0.5,
-            "description": "Highlight intensity"
+            "label": "Highlight Intensity",
+            "description": "Highlight intensity.",
+            "category": "Visuals",
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.05,
+            "ui_control": "input",
+            "depends_on": {"key": SETTING_HIGHLIGHT_DISCONNECTED_ENABLED, "equals": true}
         },
         SETTING_GROUP_PATTERNS_ENABLED: {
             "type": "bool",
             "default": true,
-            "description": "Enable group patterns and custom colors"
+            "label": "Group Patterns & Colors",
+            "description": "Enable custom group patterns and colors.",
+            "category": "Visuals"
         },
         SETTING_GROUP_COLOR_PICKER_ENABLED: {
             "type": "bool",
             "default": true,
-            "description": "Enable custom color picker for group nodes"
+            "label": "Group Custom Color Picker",
+            "description": "Enable custom color picker for group nodes.",
+            "category": "Visuals",
+            "depends_on": {"key": SETTING_GROUP_PATTERNS_ENABLED, "equals": true}
         },
         SETTING_GROUP_PATTERNS_DATA: {
             "type": "dict",
             "default": {},
-            "description": "Stored group pattern settings"
+            "label": "Group Pattern Data",
+            "description": "Stored group pattern settings.",
+            "category": "Visuals",
+            "hidden": true
         },
         SETTING_COLOR_PICKER_DATA: {
             "type": "dict",
             "default": {},
-            "description": "Color picker swatches and recents"
+            "label": "Color Picker Data",
+            "description": "Color picker swatches and recents.",
+            "category": "Visuals",
+            "hidden": true
         },
         SETTING_HIDE_PURCHASED_TOKENS: {
             "type": "bool",
             "default": true,
-            "description": "Hide purchased tokens in the shop"
+            "label": "Hide Purchased Tokens",
+            "description": "Hide purchased tokens in the shop.",
+            "category": "Shop & Requests"
         },
         SETTING_HIDE_MAXED_UPGRADES: {
             "type": "bool",
             "default": true,
-            "description": "Hide maxed upgrades in the shop"
+            "label": "Hide Maxed Upgrades",
+            "description": "Hide maxed upgrades in the shop.",
+            "category": "Shop & Requests"
         },
         SETTING_HIDE_CLAIMED_REQUESTS: {
             "type": "bool",
             "default": true,
-            "description": "Hide claimed requests"
+            "label": "Hide Claimed Requests",
+            "description": "Hide claimed requests.",
+            "category": "Shop & Requests"
         }
     }
-    _settings.register_schema(MOD_ID, schema)
+    _settings.register_schema(MOD_ID, schema, SETTINGS_PREFIX)
     if existing_wire_drop is String and existing_wire_drop == missing_sentinel and legacy_wire_drop != null:
         _settings.set_value(SETTING_WIRE_DROP_ENABLED, bool(legacy_wire_drop))
 
@@ -532,7 +719,6 @@ func _on_hud_ready(_payload: Dictionary) -> void:
         return
     _hud_ready = true
     _ui_manager = _core.ui_manager if _core != null else null
-    _ensure_settings_tab()
     if _notification_history != null:
         _notification_history.on_hud_ready()
     if _visual_effects != null:
@@ -967,6 +1153,23 @@ func _on_screenshot_selection() -> void:
 func _on_screenshot_folder() -> void:
     if _screenshot != null:
         _screenshot.open_screenshot_folder()
+
+func _change_screenshot_folder() -> void:
+    if _screenshot == null or _settings == null:
+        return
+    _screenshot.show_folder_dialog(func(dir: String):
+        _settings.set_value(SETTING_SCREENSHOT_FOLDER, dir)
+    )
+
+func _reset_wire_colors() -> void:
+    if _settings == null:
+        return
+    _settings.set_value(SETTING_WIRE_COLORS_HEX, {})
+
+func _get_wire_color(resource_id: String) -> Color:
+    if _wire_colors != null:
+        return _wire_colors.get_color(resource_id)
+    return Color.WHITE
 
 func _ensure_color_picker() -> void:
     if _color_picker_layer != null:
