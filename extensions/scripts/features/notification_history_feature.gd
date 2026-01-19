@@ -9,6 +9,7 @@ var _max_entries: int = 20
 var _panel: Control = null
 var _pending: Array = []
 var _signals_connected: bool = false
+var _retry_count: int = 0
 
 
 func setup(core) -> void:
@@ -37,18 +38,36 @@ func on_hud_ready() -> void:
 		return
 	if _core == null or _core.ui_manager == null:
 		return
+	# Try to find the extras container, with retry if not ready yet
+	var extras_container = _get_extras_container()
+	if extras_container == null:
+		# Container not ready yet, retry after a frame
+		if _retry_count < 10:
+			_retry_count += 1
+			if Engine.get_main_loop():
+				Engine.get_main_loop().process_frame.connect(_on_retry_hud_ready, CONNECT_ONE_SHOT)
+			return
+	_setup_panel(extras_container)
+
+
+func _on_retry_hud_ready() -> void:
+	on_hud_ready()
+
+
+func _setup_panel(extras_container: Node) -> void:
 	_panel = NotificationLogPanelScript.new()
 	_panel.call("set_max_notifications", _max_entries)
 	_panel.visible = _enabled
 	# Add to ExtrasButtons container (same as Puzzle/Core button) so they appear side by side
-	var extras_container = _get_extras_container()
 	if extras_container != null:
 		extras_container.add_child(_panel)
 		# Move to position 1 (after the Puzzle button at index 0)
 		extras_container.move_child(_panel, 1)
 	else:
-		# Fallback to HUD zone if container not found
-		_core.ui_manager.inject_hud_widget(TajsCoreHudInjector.HudZone.TOP_RIGHT, _panel, 10)
+		# Fallback to HUD zone if container not found after all retries
+		# Use integer value 1 (TOP_RIGHT) instead of TajsCoreHudInjector.HudZone.TOP_RIGHT
+		# to avoid issues with global class availability in shipped builds
+		_core.ui_manager.inject_hud_widget(1, _panel, 10)
 	if not _pending.is_empty():
 		for entry in _pending:
 			_panel.call("add_notification", entry.get("icon", ""), entry.get("text", ""))
