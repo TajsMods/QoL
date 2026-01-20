@@ -26,6 +26,7 @@ const DisconnectedHighlightFeatureScript = preload("res://mods-unpacked/Tajemnik
 const BreachThreatFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/breach_threat_feature.gd")
 const GroupPatternsFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/group_patterns_feature.gd")
 const GroupLayerFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/group_layer_feature.gd")
+const GotoGroupManagerScript = preload("res://mods-unpacked/TajemnikTV-Core/core/util/goto_group_manager.gd")
 const CoreColorPickerPanelScript = preload("res://mods-unpacked/TajemnikTV-Core/core/ui/color_picker_panel.gd")
 
 const SETTING_SMART_SELECT_ENABLED := "%s.smart_select_enabled" % SETTINGS_PREFIX
@@ -110,6 +111,9 @@ var _core
 var _settings
 var _ui_manager
 var _sticky_note_manager
+var _goto_group_manager
+var _palette_controller
+var _palette_overlay
 
 var _smart_select
 var _wire_clear
@@ -619,6 +623,13 @@ func _init_features() -> void:
     _group_layer.setup(_core)
     add_child(_group_layer)
 
+    _goto_group_manager = GotoGroupManagerScript.new()
+    if _goto_group_manager.has_method("setup"):
+        _goto_group_manager.setup(_core)
+    add_child(_goto_group_manager)
+    if _core != null and _core.has_method("extend_globals"):
+        _core.extend_globals("goto_group_manager", _goto_group_manager)
+
     _sticky_note_manager = StickyNoteManagerScript.new()
     _sticky_note_manager.setup(_settings, get_tree(), self)
     add_child(_sticky_note_manager)
@@ -682,6 +693,7 @@ func _register_events() -> void:
     if _core.event_bus != null:
         _core.event_bus.on("game.hud_ready", Callable(self, "_on_hud_ready"), self, true)
         _core.event_bus.on("game.desktop_ready", Callable(self, "_on_desktop_ready"), self, true)
+        _core.event_bus.on("command_palette.ready", Callable(self, "_on_palette_ready"), self, true)
     if get_tree() != null and not get_tree().node_added.is_connected(_on_node_added):
         get_tree().node_added.connect(_on_node_added)
     call_deferred("_check_existing_hud")
@@ -807,6 +819,16 @@ func _register_commands() -> void:
     _register_toggle_command(registry, "tajs_qol.toggle_extra_glow", "Extra Glow", SETTING_GLOW_ENABLED, false, "res://textures/icons/eye_ball.png", ["glow", "bloom", "visual"])
     _register_toggle_command(registry, "tajs_qol.toggle_group_patterns", "Group Patterns", SETTING_GROUP_PATTERNS_ENABLED, true, "res://textures/icons/grid.png", ["group", "pattern", "visual"])
 
+    registry.register_command("tajs_qol.goto_group", {
+        "title": "Go To Group",
+        "description": "Open the group picker to navigate to a node group",
+        "category_path": ["Tools"],
+        "keywords": ["goto", "go to", "group", "node", "navigate", "jump"],
+        "icon_path": "res://textures/icons/crosshair.png",
+        "badge": "SAFE",
+        "keep_open": true
+    }, Callable(self, "_on_goto_group"))
+
     # Register "Notes" subcategory under "Tools"
     registry.register({
         "id": "cat_tools_notes",
@@ -827,6 +849,16 @@ func _register_commands() -> void:
         "icon_path": "res://textures/icons/document.png",
         "badge": "SAFE"
     }, Callable(self, "_on_create_sticky_note"))
+
+    registry.register_command("tajs_qol.goto_note", {
+        "title": "Go To Note",
+        "description": "Open the note picker to navigate to a sticky note",
+        "category_path": ["Tools", "Notes"],
+        "keywords": ["note", "sticky", "goto", "go to", "navigate", "jump"],
+        "icon_path": "res://textures/icons/crosshair.png",
+        "badge": "SAFE",
+        "keep_open": true
+    }, Callable(self, "_on_goto_note"))
 
     registry.register_command("tajs_qol.notifications.open", {
         "title": "Open Notification History",
@@ -1118,6 +1150,83 @@ func _build_settings_ui(container: VBoxContainer) -> void:
 func _on_create_sticky_note(_ctx = null) -> void:
     if _sticky_note_manager:
         _sticky_note_manager.create_note_at_camera_center()
+
+func _on_goto_group(_ctx = null) -> void:
+    if _goto_group_manager == null:
+        _notify("exclamation", "Group manager not initialized")
+        return
+    var groups = _goto_group_manager.get_all_groups()
+    if groups.is_empty():
+        _notify("exclamation", "No groups on desktop")
+        return
+    var overlay = _get_palette_overlay()
+    if overlay == null or not overlay.has_method("show_group_picker"):
+        _notify("exclamation", "Command Palette not available")
+        return
+    _connect_palette_signals()
+    overlay.show_group_picker(groups, _goto_group_manager)
+
+func _on_goto_note(_ctx = null) -> void:
+    if _sticky_note_manager == null:
+        _notify("exclamation", "Sticky notes not initialized")
+        return
+    var notes = _sticky_note_manager.get_all_notes()
+    if notes.is_empty():
+        _notify("exclamation", "No notes on desktop")
+        return
+    var overlay = _get_palette_overlay()
+    if overlay == null or not overlay.has_method("show_note_picker"):
+        _notify("exclamation", "Command Palette not available")
+        return
+    _connect_palette_signals()
+    overlay.show_note_picker(notes, _sticky_note_manager)
+
+func _on_palette_ready(payload: Dictionary) -> void:
+    _palette_controller = payload.get("controller", null)
+    _palette_overlay = payload.get("overlay", null)
+    _connect_palette_signals()
+
+func _get_palette_overlay():
+    if _palette_overlay != null and is_instance_valid(_palette_overlay):
+        return _palette_overlay
+    if _core != null:
+        var overlay = _core.get("command_palette_overlay")
+        if overlay != null and is_instance_valid(overlay):
+            _palette_overlay = overlay
+            _palette_controller = _core.get("command_palette_controller")
+            _connect_palette_signals()
+            return _palette_overlay
+    return null
+
+func _connect_palette_signals() -> void:
+    if _palette_overlay == null or not is_instance_valid(_palette_overlay):
+        return
+    if _palette_overlay.has_signal("group_selected"):
+        if not _palette_overlay.group_selected.is_connected(_on_palette_group_selected):
+            _palette_overlay.group_selected.connect(_on_palette_group_selected)
+    if _palette_overlay.has_signal("note_picker_selected"):
+        if not _palette_overlay.note_picker_selected.is_connected(_on_palette_note_selected):
+            _palette_overlay.note_picker_selected.connect(_on_palette_note_selected)
+
+func _on_palette_group_selected(group) -> void:
+    if _goto_group_manager != null:
+        _goto_group_manager.navigate_to_group(group)
+
+func _on_palette_note_selected(note) -> void:
+    if _sticky_note_manager != null:
+        _sticky_note_manager.navigate_to_note(note)
+
+func _notify(icon: String, message: String) -> void:
+    if _core != null and _core.has_method("notify"):
+        _core.notify(icon, message)
+        return
+    var root = Engine.get_main_loop().root if Engine.get_main_loop() != null else null
+    if root != null:
+        var signals = root.get_node_or_null("Signals")
+        if signals != null and signals.has_signal("notify"):
+            signals.emit_signal("notify", icon, message)
+            return
+    print("%s %s" % [LOG_NAME, message])
 
 
 func _bind_toggle(ui, container: VBoxContainer, label: String, setting_key: String, default_value: bool, tooltip: String) -> void:
