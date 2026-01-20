@@ -33,6 +33,7 @@ const SETTING_SMART_SELECT_ENABLED := "%s.smart_select_enabled" % SETTINGS_PREFI
 const SETTING_WIRE_CLEAR_ENABLED := "%s.wire_clear_enabled" % SETTINGS_PREFIX
 const SETTING_WIRE_DROP_ENABLED := "%s.wire_drop_enabled" % SETTINGS_PREFIX
 const SETTING_DISABLE_SLIDER_SCROLL := "%s.disable_slider_scroll" % SETTINGS_PREFIX
+const SETTING_EXTRA_INPUTS_ENABLED := "%s.extra_inputs_enabled" % SETTINGS_PREFIX
 const SETTING_BREACH_ESCALATION_ENABLED := "%s.breach_escalation_enabled" % SETTINGS_PREFIX
 const SETTING_BREACH_ESCALATION_THRESHOLD := "%s.breach_escalation_threshold" % SETTINGS_PREFIX
 const SETTING_BREACH_DEESCALATION_ENABLED := "%s.breach_deescalation_enabled" % SETTINGS_PREFIX
@@ -77,6 +78,7 @@ const SETTINGS_KEYS := [
     SETTING_WIRE_CLEAR_ENABLED,
     SETTING_WIRE_DROP_ENABLED,
     SETTING_DISABLE_SLIDER_SCROLL,
+    SETTING_EXTRA_INPUTS_ENABLED,
     SETTING_BREACH_ESCALATION_ENABLED,
     SETTING_BREACH_ESCALATION_THRESHOLD,
     SETTING_BREACH_DEESCALATION_ENABLED,
@@ -148,6 +150,8 @@ var _color_picker_callback: Callable = Callable()
 func _init() -> void:
     if _has_global_class("ModLoaderMod"):
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/windows/window_group.gd")
+        ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/windows/window_inventory.gd")
+        ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/windows/window_bin.gd")
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/options_bar.gd")
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/tokens_tab.gd")
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/upgrades_tab.gd")
@@ -231,6 +235,14 @@ func _register_settings() -> void:
             "label": "Disable Slider Scroll",
             "description": "Prevent mouse wheel from changing slider values.",
             "category": "Input"
+        },
+        SETTING_EXTRA_INPUTS_ENABLED: {
+            "type": "bool",
+            "default": false,
+            "label": "Extra Input Slots",
+            "description": "Add extra input slots to Inventory and Bin windows.",
+            "category": "Quality of Life",
+            "requires_restart": true
         },
         SETTING_BREACH_ESCALATION_ENABLED: {
             "type": "bool",
@@ -820,6 +832,7 @@ func _register_commands() -> void:
     _register_toggle_command(registry, "tajs_qol.toggle_wire_clear", "Wire Clear", SETTING_WIRE_CLEAR_ENABLED, true, "res://textures/icons/wire.png", ["wire", "clear", "disconnect"])
     _register_toggle_command(registry, "tajs_qol.toggle_wire_drop", "Wire Drop Menu", SETTING_WIRE_DROP_ENABLED, true, "res://textures/icons/connections.png", ["wire", "drop", "menu", "spawn"])
     _register_toggle_command(registry, "tajs_qol.toggle_slider_scroll", "Disable Slider Scroll", SETTING_DISABLE_SLIDER_SCROLL, false, "res://textures/icons/chevron_down.png", ["slider", "scroll", "wheel"])
+    _register_toggle_command(registry, "tajs_qol.toggle_extra_inputs", "Extra Input Slots", SETTING_EXTRA_INPUTS_ENABLED, false, "res://textures/icons/connections.png", ["input", "slot", "inventory", "bin"])
     _register_toggle_command(registry, "tajs_qol.toggle_focus_mute", "Focus Mute", SETTING_FOCUS_MUTE_ENABLED, true, "res://textures/icons/sound.png", ["audio", "mute", "focus"])
     _register_toggle_command(registry, "tajs_qol.toggle_notifications", "Notification History", SETTING_NOTIFICATION_HISTORY_ENABLED, true, "res://textures/icons/exclamation.png", ["toast", "log", "history"])
     _register_toggle_command(registry, "tajs_qol.toggle_controller_block", "Disable Controller Input", SETTING_CONTROLLER_BLOCK_ENABLED, false, "res://textures/icons/controller.png", ["controller", "gamepad", "input"])
@@ -962,6 +975,7 @@ func _build_settings_ui(container: VBoxContainer) -> void:
     _bind_toggle(ui, container, "Right-click Wire Clear", SETTING_WIRE_CLEAR_ENABLED, true, "Right-click connectors to disconnect wires.")
     _bind_toggle(ui, container, "Wire Drop Menu", SETTING_WIRE_DROP_ENABLED, true, "Show a node picker when wires are dropped on empty canvas.")
     _bind_toggle(ui, container, "Disable Slider Scroll", SETTING_DISABLE_SLIDER_SCROLL, false, "Prevent mouse wheel from changing slider values.")
+    _bind_toggle(ui, container, "Extra Input Slots", SETTING_EXTRA_INPUTS_ENABLED, false, "Add extra input slots to Inventory and Bin windows.")
 
     _bind_toggle(ui, container, "Mute on Focus Loss", SETTING_FOCUS_MUTE_ENABLED, true, "Lower volume when the game loses focus.")
     var volume_slider = ui.add_slider(container, "Background Volume", _settings.get_float(SETTING_FOCUS_BG_VOLUME, 0.0), 0.0, 100.0, 5.0, "%", func(v):
