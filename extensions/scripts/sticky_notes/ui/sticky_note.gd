@@ -138,7 +138,7 @@ func _build_ui() -> void:
     _title_panel.anchor_right = 1
     _title_panel.anchor_bottom = 0
     _title_panel.offset_bottom = 56
-    _title_panel.mouse_filter = Control.MOUSE_FILTER_PASS # Allow scroll events to pass through
+    _title_panel.mouse_filter = Control.MOUSE_FILTER_STOP # Stop input to prevent camera panning when dragging note
     _title_panel.gui_input.connect(_on_title_panel_input)
     
     # Styling
@@ -700,6 +700,28 @@ func _on_title_panel_input(event: InputEvent) -> void:
     
     elif event is InputEventMouseMotion and _is_dragging:
         var new_pos = get_global_mouse_position() - _drag_offset
+        global_position = new_pos.snappedf(GRID_SIZE)
+        _update_handle_positions()
+        accept_event()
+    
+    # Handle touch events for dragging - DO NOT forward to camera
+    elif event is InputEventScreenTouch:
+        if event.pressed:
+            _is_dragging = true
+            _drag_offset = event.position - global_position
+            drag_started.emit()
+            _set_selected(true)
+        else:
+            if _is_dragging:
+                _is_dragging = false
+                global_position = global_position.snappedf(GRID_SIZE)
+                _update_handle_positions()
+                drag_ended.emit()
+                _emit_changed()
+        accept_event()
+    
+    elif event is InputEventScreenDrag and _is_dragging:
+        var new_pos = event.position - _drag_offset
         global_position = new_pos.snappedf(GRID_SIZE)
         _update_handle_positions()
         accept_event()
