@@ -3,6 +3,7 @@ extends "res://scenes/windows/window_group.gd"
 const SETTINGS_ENABLED_KEY := "tajs_qol.group_patterns_enabled"
 const SETTINGS_DATA_KEY := "tajs_qol.group_patterns"
 const SETTINGS_COLOR_PICKER_ENABLED_KEY := "tajs_qol.group_color_picker_enabled"
+const SETTINGS_LOCK_DATA_KEY := "tajs_qol.group_lock_data"
 
 const VANILLA_COLORS: Array[String] = ["1a202c", "1a2b22", "1a292b", "1a1b2b", "211a2b", "2b1a27", "2b1a1a"]
 
@@ -25,12 +26,14 @@ var _pattern_picker_layer: CanvasLayer = null
 var _pattern_picker: Control = null
 var _color_picker_layer: CanvasLayer = null
 var _color_picker = null
+var locked: bool = false
 
 
 func _ready() -> void:
 	super._ready()
 	_patterns_enabled = _is_patterns_enabled()
 	_color_picker_enabled = _is_color_picker_enabled()
+	_load_lock_from_settings()
 	if not _patterns_enabled:
 		return
 	_ensure_pattern_ui()
@@ -322,6 +325,39 @@ func _on_color_picked(new_color: Color) -> void:
 	Sound.play("click2")
 
 
+func toggle_lock() -> void:
+	locked = !locked
+	_save_lock_to_settings()
+	if locked:
+		Signals.notify.emit("lock", "Group locked")
+	else:
+		Signals.notify.emit("unlock", "Group unlocked")
+
+
+func is_locked() -> bool:
+	return locked
+
+
+func grab(g: bool) -> void:
+	if locked and g:
+		Sound.play("error")
+		return
+	super.grab(g)
+
+
+func _on_move_selection(to: Vector2) -> void:
+	if locked:
+		return
+	super._on_move_selection(to)
+
+
+func set_resizing(l: bool, t: bool, r: bool, b: bool) -> void:
+	if locked and (l or t or r or b):
+		Sound.play("error")
+		return
+	super.set_resizing(l, t, r, b)
+
+
 func _find_nearest_vanilla_color_index(target: Color) -> int:
 	var best_index := 0
 	var best_distance := INF
@@ -387,6 +423,30 @@ func _get_group_data() -> Dictionary:
 
 func _get_group_key() -> String:
 	return str(name)
+
+
+func _load_lock_from_settings() -> void:
+	var settings = _get_core_settings()
+	if settings == null:
+		return
+	var all_data: Dictionary = settings.get_dict(SETTINGS_LOCK_DATA_KEY, {})
+	var entry = all_data.get(_get_group_key(), null)
+	if entry is bool:
+		locked = entry
+	else:
+		locked = false
+
+
+func _save_lock_to_settings() -> void:
+	var settings = _get_core_settings()
+	if settings == null:
+		return
+	var all_data: Dictionary = settings.get_dict(SETTINGS_LOCK_DATA_KEY, {})
+	if locked:
+		all_data[_get_group_key()] = true
+	else:
+		all_data.erase(_get_group_key())
+	settings.set_value(SETTINGS_LOCK_DATA_KEY, all_data)
 
 
 func _is_patterns_enabled() -> bool:

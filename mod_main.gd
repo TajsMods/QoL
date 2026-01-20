@@ -66,6 +66,7 @@ const SETTING_HIGHLIGHT_DISCONNECTED_INTENSITY := "%s.highlight_disconnected_int
 const SETTING_GROUP_PATTERNS_ENABLED := "%s.group_patterns_enabled" % SETTINGS_PREFIX
 const SETTING_GROUP_COLOR_PICKER_ENABLED := "%s.group_color_picker_enabled" % SETTINGS_PREFIX
 const SETTING_GROUP_PATTERNS_DATA := "%s.group_patterns" % SETTINGS_PREFIX
+const SETTING_GROUP_LOCK_DATA := "%s.group_lock_data" % SETTINGS_PREFIX
 const SETTING_COLOR_PICKER_DATA := "%s.color_picker" % SETTINGS_PREFIX
 const SETTING_HIDE_PURCHASED_TOKENS := "%s.hide_purchased_tokens" % SETTINGS_PREFIX
 const SETTING_HIDE_MAXED_UPGRADES := "%s.hide_maxed_upgrades" % SETTINGS_PREFIX
@@ -147,6 +148,7 @@ var _color_picker_callback: Callable = Callable()
 func _init() -> void:
     if _has_global_class("ModLoaderMod"):
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/windows/window_group.gd")
+        ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/options_bar.gd")
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/tokens_tab.gd")
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/upgrades_tab.gd")
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/request_panel.gd")
@@ -533,6 +535,14 @@ func _register_settings() -> void:
             "label": "Group Pattern Data",
             "description": "Stored group pattern settings.",
             "category": "Visuals",
+            "hidden": true
+        },
+        SETTING_GROUP_LOCK_DATA: {
+            "type": "dict",
+            "default": {},
+            "label": "Group Lock Data",
+            "description": "Stored group lock state.",
+            "category": "Quality of Life",
             "hidden": true
         },
         SETTING_COLOR_PICKER_DATA: {
