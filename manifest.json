@@ -1,7 +1,7 @@
 {
 	"name": "QoL",
 	"namespace": "TajemnikTV",
-	"version_number": "1.4.1",
+	"version_number": "1.4.2",
 	"description": "Quality-of-life utilities powered by Taj's Core.",
 	"website_url": "https://github.com/TajsMods/QoL",
 	"dependencies": ["TajemnikTV-Core"],
