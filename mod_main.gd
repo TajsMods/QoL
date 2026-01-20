@@ -807,6 +807,18 @@ func _register_commands() -> void:
     _register_toggle_command(registry, "tajs_qol.toggle_extra_glow", "Extra Glow", SETTING_GLOW_ENABLED, false, "res://textures/icons/eye_ball.png", ["glow", "bloom", "visual"])
     _register_toggle_command(registry, "tajs_qol.toggle_group_patterns", "Group Patterns", SETTING_GROUP_PATTERNS_ENABLED, true, "res://textures/icons/grid.png", ["group", "pattern", "visual"])
 
+    # Register "Notes" subcategory under "Tools"
+    registry.register({
+        "id": "cat_tools_notes",
+        "title": "Notes",
+        "category_path": ["Tools"],
+        "keywords": ["notes", "sticky", "memo"],
+        "hint": "Sticky notes and annotations",
+        "icon_path": "res://textures/icons/document.png",
+        "is_category": true,
+        "badge": "SAFE"
+    })
+
     registry.register_command("tajs_qol.create_sticky_note", {
         "title": "Create Sticky Note",
         "description": "Create a new sticky note at camera center",
