@@ -90,11 +90,9 @@ func _is_extra_inputs_enabled() -> bool:
 
 
 func _get_core_settings():
-	var core = TajsCoreRuntime.instance()
-	if core != null and core.settings != null:
-		return core.settings
+	# Access TajsCore via Engine metadata to avoid parse-time dependency
 	if Engine.has_meta("TajsCore"):
-		var meta_core = Engine.get_meta("TajsCore")
-		if meta_core != null and meta_core.settings != null:
-			return meta_core.settings
+		var core = Engine.get_meta("TajsCore")
+		if core != null and core.settings != null:
+			return core.settings
 	return null
