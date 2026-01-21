@@ -44,6 +44,8 @@ const SETTING_FOCUS_BG_VOLUME := "%s.focus_background_volume" % SETTINGS_PREFIX
 const SETTING_NOTIFICATION_HISTORY_ENABLED := "%s.notification_history_enabled" % SETTINGS_PREFIX
 const SETTING_NOTIFICATION_HISTORY_MAX := "%s.notification_history_max" % SETTINGS_PREFIX
 const SETTING_CONTROLLER_BLOCK_ENABLED := "%s.disable_controller_input" % SETTINGS_PREFIX
+const SETTING_CAMERA_SMOOTH_ZOOM := "%s.camera_smooth_zoom" % SETTINGS_PREFIX
+const SETTING_CAMERA_ZOOM_STEP := "%s.camera_zoom_step" % SETTINGS_PREFIX
 const SETTING_SCREENSHOT_ENABLED := "%s.screenshot_enabled" % SETTINGS_PREFIX
 const SETTING_SCREENSHOT_QUALITY := "%s.screenshot_quality" % SETTINGS_PREFIX
 const SETTING_SCREENSHOT_FOLDER := "%s.screenshot_folder" % SETTINGS_PREFIX
@@ -89,6 +91,8 @@ const SETTINGS_KEYS := [
     SETTING_NOTIFICATION_HISTORY_ENABLED,
     SETTING_NOTIFICATION_HISTORY_MAX,
     SETTING_CONTROLLER_BLOCK_ENABLED,
+    SETTING_CAMERA_SMOOTH_ZOOM,
+    SETTING_CAMERA_ZOOM_STEP,
     SETTING_SCREENSHOT_ENABLED,
     SETTING_SCREENSHOT_QUALITY,
     SETTING_SCREENSHOT_FOLDER,
@@ -153,6 +157,7 @@ func _init() -> void:
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/windows/window_inventory.gd")
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/windows/window_bin.gd")
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/options_bar.gd")
+        ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/camera_2d.gd")
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/tokens_tab.gd")
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/upgrades_tab.gd")
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/request_panel.gd")
@@ -333,6 +338,24 @@ func _register_settings() -> void:
             "label": "Disable Controller Input",
             "description": "Block all controller/joypad input.",
             "category": "Input"
+        },
+        SETTING_CAMERA_SMOOTH_ZOOM: {
+            "type": "bool",
+            "default": true,
+            "label": "Smooth Camera Zoom",
+            "description": "Use smaller, smoother scroll and pinch zoom steps.",
+            "category": "Camera"
+        },
+        SETTING_CAMERA_ZOOM_STEP: {
+            "type": "float",
+            "default": 0.1,
+            "label": "Zoom Step Size",
+            "description": "Lower values provide finer zoom steps.",
+            "category": "Camera",
+            "min": 0.02,
+            "max": 0.3,
+            "step": 0.01,
+            "depends_on": {"key": SETTING_CAMERA_SMOOTH_ZOOM, "equals": true}
         },
         SETTING_SCREENSHOT_ENABLED: {
             "type": "bool",
@@ -990,6 +1013,15 @@ func _build_settings_ui(container: VBoxContainer) -> void:
     _setting_ui_updaters[SETTING_NOTIFICATION_HISTORY_MAX] = func(value): max_slider.value = int(value)
 
     _bind_toggle(ui, container, "Disable Controller Input", SETTING_CONTROLLER_BLOCK_ENABLED, false, "Block all controller/joypad input.")
+
+    ui.add_separator(container)
+    ui.add_section_header(container, "Camera")
+
+    _bind_toggle(ui, container, "Smooth Camera Zoom", SETTING_CAMERA_SMOOTH_ZOOM, true, "Use smaller, smoother scroll and pinch zoom steps.")
+    var zoom_step_slider = ui.add_slider(container, "Zoom Step Size", _settings.get_float(SETTING_CAMERA_ZOOM_STEP, 0.1), 0.02, 0.3, 0.01, "", func(v):
+        _settings.set_value(SETTING_CAMERA_ZOOM_STEP, v)
+    )
+    _setting_ui_updaters[SETTING_CAMERA_ZOOM_STEP] = func(value): zoom_step_slider.value = float(value)
 
     ui.add_separator(container)
     ui.add_section_header(container, "Breach Threat")
