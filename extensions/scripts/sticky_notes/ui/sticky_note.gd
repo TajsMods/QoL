@@ -96,6 +96,8 @@ func _init() -> void:
     mouse_filter = Control.MOUSE_FILTER_PASS # Allow scroll events to pass through for camera zoom
 
 func _ready() -> void:
+    if not is_in_group("tajs_sticky_note"):
+        add_to_group("tajs_sticky_note")
     _build_ui()
     _setup_pickers()
     _setup_context_menu()

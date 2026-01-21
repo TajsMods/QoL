@@ -25,6 +25,8 @@ const WireColorsFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/exte
 const VisualEffectsFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/visual_effects_feature.gd")
 const DisconnectedHighlightFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/disconnected_highlight_feature.gd")
 const BreachThreatFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/breach_threat_feature.gd")
+const ContextRadialFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/context_radial_feature.gd")
+const ContextMenuProviderScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/context_menu/context_menu_provider.gd")
 const GroupPatternsFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/group_patterns_feature.gd")
 const GroupLayerFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/group_layer_feature.gd")
 const GotoGroupManagerScript = preload("res://mods-unpacked/TajemnikTV-Core/core/util/goto_group_manager.gd")
@@ -76,6 +78,7 @@ const SETTING_COLOR_PICKER_DATA := "%s.color_picker" % SETTINGS_PREFIX
 const SETTING_HIDE_PURCHASED_TOKENS := "%s.hide_purchased_tokens" % SETTINGS_PREFIX
 const SETTING_HIDE_MAXED_UPGRADES := "%s.hide_maxed_upgrades" % SETTINGS_PREFIX
 const SETTING_HIDE_CLAIMED_REQUESTS := "%s.hide_claimed_requests" % SETTINGS_PREFIX
+const SETTING_CONTEXT_RADIAL_ENABLED := "%s.context_radial_enabled" % SETTINGS_PREFIX
 
 const SETTINGS_KEYS := [
     SETTING_SMART_SELECT_ENABLED,
@@ -112,7 +115,8 @@ const SETTINGS_KEYS := [
     SETTING_HIGHLIGHT_DISCONNECTED_INTENSITY,
     SETTING_GROUP_PATTERNS_ENABLED,
     SETTING_GROUP_COLOR_PICKER_ENABLED,
-    SETTING_GROUP_PATTERNS_DATA
+    SETTING_GROUP_PATTERNS_DATA,
+    SETTING_CONTEXT_RADIAL_ENABLED
 ]
 const StickyNoteManagerScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/sticky_notes/sticky_note_manager.gd")
 
@@ -136,6 +140,8 @@ var _wire_colors
 var _visual_effects
 var _disconnected_highlight
 var _breach_threat
+var _context_radial
+var _context_menu_provider
 var _group_patterns
 var _group_layer
 
@@ -250,6 +256,13 @@ func _register_settings() -> void:
             "description": "Add extra input slots to Inventory and Bin windows.",
             "category": "Quality of Life",
             "requires_restart": true
+        },
+        SETTING_CONTEXT_RADIAL_ENABLED: {
+            "type": "bool",
+            "default": true,
+            "label": "Radial Context Menu (RMB)",
+            "description": "Show a radial context menu when right-clicking on the desktop.",
+            "category": "Quality of Life"
         },
         SETTING_BREACH_ESCALATION_ENABLED: {
             "type": "bool",
@@ -693,6 +706,15 @@ func _init_features() -> void:
     _sticky_note_manager.setup(_settings, get_tree(), self)
     add_child(_sticky_note_manager)
 
+    _context_radial = ContextRadialFeatureScript.new()
+    _context_radial.setup(_core)
+    add_child(_context_radial)
+
+    _context_menu_provider = ContextMenuProviderScript.new()
+    _context_menu_provider.setup(_core, _sticky_note_manager)
+    if _core != null and _core.context_menu != null:
+        _core.context_menu.register_provider(_context_menu_provider, "tajs_qol")
+
     _setting_handlers = {
         SETTING_SMART_SELECT_ENABLED: func(value): _smart_select.set_enabled(bool(value)),
         SETTING_WIRE_CLEAR_ENABLED: func(value): _wire_clear.set_enabled(bool(value)),
@@ -724,7 +746,8 @@ func _init_features() -> void:
         SETTING_HIGHLIGHT_DISCONNECTED_STYLE: func(value): _disconnected_highlight.set_style(str(value)),
         SETTING_HIGHLIGHT_DISCONNECTED_INTENSITY: func(value): _disconnected_highlight.set_intensity(float(value)),
         SETTING_GROUP_PATTERNS_ENABLED: func(value): _group_patterns.set_enabled(bool(value)),
-        SETTING_GROUP_COLOR_PICKER_ENABLED: func(value): _group_patterns.set_color_picker_enabled(bool(value))
+        SETTING_GROUP_COLOR_PICKER_ENABLED: func(value): _group_patterns.set_color_picker_enabled(bool(value)),
+        SETTING_CONTEXT_RADIAL_ENABLED: func(value): _context_radial.set_enabled(bool(value))
     }
 
 
@@ -889,6 +912,7 @@ func _register_commands() -> void:
     _register_toggle_command(registry, "tajs_qol.toggle_disconnected_highlight", "Disconnected Node Highlight", SETTING_HIGHLIGHT_DISCONNECTED_ENABLED, true, "res://textures/icons/eye_ball.png", ["highlight", "disconnected", "visual"])
     _register_toggle_command(registry, "tajs_qol.toggle_extra_glow", "Extra Glow", SETTING_GLOW_ENABLED, false, "res://textures/icons/eye_ball.png", ["glow", "bloom", "visual"])
     _register_toggle_command(registry, "tajs_qol.toggle_group_patterns", "Group Patterns", SETTING_GROUP_PATTERNS_ENABLED, true, "res://textures/icons/grid.png", ["group", "pattern", "visual"])
+    _register_toggle_command(registry, "tajs_qol.toggle_context_radial", "Radial Context Menu", SETTING_CONTEXT_RADIAL_ENABLED, true, "res://textures/icons/circle.png", ["radial", "context", "menu", "rmb", "right", "click"])
 
     registry.register_command("tajs_qol.goto_group", {
         "title": "Go To Group",
