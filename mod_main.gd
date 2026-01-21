@@ -11,6 +11,7 @@ const CORE_META_KEY := "TajsCore"
 const CORE_MIN_VERSION := "1.0.0"
 const SETTINGS_PREFIX := "tajs_qol"
 const KEYBIND_CATEGORY_ID := "tajs_qol"
+const ACTION_CAMERA_BOOST := "%s.camera_boost" % MOD_ID
 
 const SmartSelectFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/smart_select_feature.gd")
 const WireClearFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/wire_clear_feature.gd")
@@ -44,6 +45,7 @@ const SETTING_FOCUS_BG_VOLUME := "%s.focus_background_volume" % SETTINGS_PREFIX
 const SETTING_NOTIFICATION_HISTORY_ENABLED := "%s.notification_history_enabled" % SETTINGS_PREFIX
 const SETTING_NOTIFICATION_HISTORY_MAX := "%s.notification_history_max" % SETTINGS_PREFIX
 const SETTING_CONTROLLER_BLOCK_ENABLED := "%s.disable_controller_input" % SETTINGS_PREFIX
+const SETTING_CAMERA_WASD_SPEED := "%s.camera_wasd_speed" % SETTINGS_PREFIX
 const SETTING_CAMERA_SMOOTH_ZOOM := "%s.camera_smooth_zoom" % SETTINGS_PREFIX
 const SETTING_CAMERA_ZOOM_STEP := "%s.camera_zoom_step" % SETTINGS_PREFIX
 const SETTING_SCREENSHOT_ENABLED := "%s.screenshot_enabled" % SETTINGS_PREFIX
@@ -338,6 +340,18 @@ func _register_settings() -> void:
             "label": "Disable Controller Input",
             "description": "Block all controller/joypad input.",
             "category": "Input"
+        },
+        SETTING_CAMERA_WASD_SPEED: {
+            "type": "float",
+            "default": 1.0,
+            "label": "WASD Move Speed",
+            "description": "Multiplier for keyboard camera panning.",
+            "category": "Camera",
+            "min": 0.25,
+            "max": 3.0,
+            "step": 0.05,
+            "suffix": "x",
+            "precision": 2
         },
         SETTING_CAMERA_SMOOTH_ZOOM: {
             "type": "bool",
@@ -810,7 +824,7 @@ func _register_keybinds() -> void:
         [select_event],
         _core.keybinds.CONTEXT_GAMEPLAY,
         Callable(self, "_on_select_all"),
-        0,
+        -1,
         KEYBIND_CATEGORY_ID
     )
     _core.keybinds.register_action_scoped(
@@ -820,6 +834,17 @@ func _register_keybinds() -> void:
         [],
         _core.keybinds.CONTEXT_ANY,
         Callable(self, "_on_wire_drop_toggle"),
+        0,
+        KEYBIND_CATEGORY_ID
+    )
+    var boost_event = _core.keybinds.make_key_event(KEY_SHIFT)
+    _core.keybinds.register_action(
+        ACTION_CAMERA_BOOST,
+        "Camera Boost (Hold)",
+        [boost_event],
+        _core.keybinds.CONTEXT_GAMEPLAY,
+        Callable(),
+        MOD_ID,
         0,
         KEYBIND_CATEGORY_ID
     )
@@ -1016,6 +1041,11 @@ func _build_settings_ui(container: VBoxContainer) -> void:
 
     ui.add_separator(container)
     ui.add_section_header(container, "Camera")
+
+    var wasd_speed_slider = ui.add_slider(container, "WASD Move Speed", _settings.get_float(SETTING_CAMERA_WASD_SPEED, 1.0), 0.25, 3.0, 0.05, "x", func(v):
+        _settings.set_value(SETTING_CAMERA_WASD_SPEED, v)
+    )
+    _setting_ui_updaters[SETTING_CAMERA_WASD_SPEED] = func(value): wasd_speed_slider.value = float(value)
 
     _bind_toggle(ui, container, "Smooth Camera Zoom", SETTING_CAMERA_SMOOTH_ZOOM, true, "Use smaller, smoother scroll and pinch zoom steps.")
     var zoom_step_slider = ui.add_slider(container, "Zoom Step Size", _settings.get_float(SETTING_CAMERA_ZOOM_STEP, 0.1), 0.02, 0.3, 0.01, "", func(v):
