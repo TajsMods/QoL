@@ -1,3 +1,5 @@
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/TajsMods/QoL)
+
 # Taj's QoL
 
 Quality-of-life utilities for Upload Labs, refactored to use Taj's Core services.
