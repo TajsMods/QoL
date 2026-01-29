@@ -624,7 +624,7 @@ func _update_title_icon() -> void:
 	if not _title_icon:
 		return
 
-	var core := TajsCoreRuntime.instance()
+	var core = Engine.get_meta("TajsCore", null)
 	if core != null:
 		var registry = core.get_icon_registry()
 		if registry != null:

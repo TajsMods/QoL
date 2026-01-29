@@ -39,7 +39,7 @@ func _resolve_icon_texture(icon_id: String) -> Texture2D:
 	# Normalize legacy icon IDs before resolving
 	icon_id = _normalize_icon_id(icon_id)
 	
-	var core := TajsCoreRuntime.instance()
+	var core = Engine.get_meta("TajsCore", null)
 	if core != null:
 		var registry = core.get_icon_registry()
 		if registry != null:

@@ -190,7 +190,7 @@ func _get_icon_label(icon_id: String) -> String:
 
 
 func _get_icon_entry(icon_id: String) -> Dictionary:
-	var core := TajsCoreRuntime.instance()
+	var core = Engine.get_meta("TajsCore", null)
 	if core != null:
 		var registry = core.get_icon_registry()
 		if registry != null:
@@ -202,7 +202,7 @@ func _get_icon_entry(icon_id: String) -> Dictionary:
 
 
 func _resolve_icon_texture(icon_id: String) -> Texture2D:
-	var core := TajsCoreRuntime.instance()
+	var core = Engine.get_meta("TajsCore", null)
 	if core != null:
 		var registry = core.get_icon_registry()
 		if registry != null:

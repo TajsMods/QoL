@@ -56,7 +56,7 @@ func get_icon() -> String:
 	var icon_id := str(custom_icon)
 	if icon_id == "":
 		return DEFAULT_ICON_PATH
-	var core := TajsCoreRuntime.instance()
+	var core = Engine.get_meta("TajsCore", null)
 	if core != null:
 		var registry = core.get_icon_registry()
 		if registry != null:
@@ -74,7 +74,7 @@ func get_icon() -> String:
 
 
 func _resolve_icon_texture(icon_id: String) -> Texture2D:
-	var core := TajsCoreRuntime.instance()
+	var core = Engine.get_meta("TajsCore", null)
 	if core != null:
 		var registry = core.get_icon_registry()
 		if registry != null:
