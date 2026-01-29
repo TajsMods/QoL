@@ -4,6 +4,7 @@ const SETTINGS_ENABLED_KEY := "tajs_qol.group_patterns_enabled"
 const SETTINGS_DATA_KEY := "tajs_qol.group_patterns"
 const SETTINGS_COLOR_PICKER_ENABLED_KEY := "tajs_qol.group_color_picker_enabled"
 const SETTINGS_LOCK_DATA_KEY := "tajs_qol.group_lock_data"
+const DEFAULT_ICON_PATH := "res://textures/icons/window.png"
 
 const VANILLA_COLORS: Array[String] = ["1a202c", "1a2b22", "1a292b", "1a1b2b", "211a2b", "2b1a27", "2b1a1a"]
 
@@ -34,12 +35,66 @@ func _ready() -> void:
 	_patterns_enabled = _is_patterns_enabled()
 	_color_picker_enabled = _is_color_picker_enabled()
 	_load_lock_from_settings()
+	update_icon()
 	if not _patterns_enabled:
 		return
 	_ensure_pattern_ui()
 	_load_from_settings()
 	update_color()
 	update_pattern()
+
+
+func update_icon() -> void:
+	var tex := _resolve_icon_texture(custom_icon)
+	if tex != null:
+		$TitlePanel / TitleContainer / Icon.texture = tex
+	else:
+		$TitlePanel / TitleContainer / Icon.texture = load(DEFAULT_ICON_PATH)
+
+
+func get_icon() -> String:
+	var icon_id := str(custom_icon)
+	if icon_id == "":
+		return DEFAULT_ICON_PATH
+	var core := TajsCoreRuntime.instance()
+	if core != null:
+		var registry = core.get_icon_registry()
+		if registry != null:
+			var resolved: Dictionary = registry.resolve_icon(icon_id)
+			var path := str(resolved.get("path", ""))
+			if path != "":
+				return path
+	if icon_id.begins_with("res://"):
+		return icon_id
+	if icon_id.find(":") != -1:
+		var parts := icon_id.split(":", false, 1)
+		if parts.size() == 2 and parts[1] != "":
+			return "res://textures/icons".path_join(parts[1])
+	return "res://textures/icons/" + icon_id + ".png"
+
+
+func _resolve_icon_texture(icon_id: String) -> Texture2D:
+	var core := TajsCoreRuntime.instance()
+	if core != null:
+		var registry = core.get_icon_registry()
+		if registry != null:
+			var resolved: Dictionary = registry.resolve_icon(icon_id)
+			if resolved.get("texture", null) != null:
+				return resolved.texture
+	if icon_id == "":
+		return load(DEFAULT_ICON_PATH)
+	if icon_id.begins_with("res://") and ResourceLoader.exists(icon_id):
+		return load(icon_id)
+	if icon_id.find(":") != -1:
+		var parts := icon_id.split(":", false, 1)
+		if parts.size() == 2 and parts[1] != "":
+			var mapped_path := "res://textures/icons".path_join(parts[1])
+			if ResourceLoader.exists(mapped_path):
+				return load(mapped_path)
+	var fallback_path := "res://textures/icons/" + icon_id + ".png"
+	if ResourceLoader.exists(fallback_path):
+		return load(fallback_path)
+	return null
 
 
 func set_qol_patterns_enabled(enabled: bool) -> void:

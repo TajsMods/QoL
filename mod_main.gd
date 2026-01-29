@@ -171,6 +171,9 @@ func _init() -> void:
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/request_panel.gd")
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/requests_tab.gd")
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/window_breach.gd")
+        ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/popup_schematic.gd")
+        ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/edit_group_popup.gd")
+        ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/schematic_container.gd")
     _core = _get_core()
     if _core == null:
         _log_warn("Taj's Core not found; QoL disabled.")
