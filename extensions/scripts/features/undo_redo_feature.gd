@@ -38,7 +38,7 @@ func setup(core) -> void:
     
     # Wait for desktop to be ready to add buttons
     if _core.event_bus != null:
-        _core.event_bus.on("game.desktop_ready", Callable(self, "_on_desktop_ready"), self, true)
+        _core.event_bus.on("game.desktop_ready", Callable(self , "_on_desktop_ready"), self , true)
     
     # Check if desktop already exists
     call_deferred("_check_existing_desktop")
@@ -66,6 +66,8 @@ func set_enabled(enabled: bool) -> void:
 func set_buttons_enabled(enabled: bool) -> void:
     _buttons_enabled = enabled
     if _initialized:
+        if enabled and _undo_button == null:
+            _add_toolbar_buttons()
         _update_buttons_visibility()
 
 

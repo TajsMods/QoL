@@ -41,6 +41,7 @@ const SETTING_DISABLE_SLIDER_SCROLL := "%s.disable_slider_scroll" % SETTINGS_PRE
 const SETTING_EXTRA_INPUTS_ENABLED := "%s.extra_inputs_enabled" % SETTINGS_PREFIX
 const SETTING_GOTO_GROUP_BUTTON_ENABLED := "%s.goto_group_button_enabled" % SETTINGS_PREFIX
 const SETTING_GOTO_NOTE_BUTTON_ENABLED := "%s.goto_note_button_enabled" % SETTINGS_PREFIX
+const SETTING_UNDO_REDO_BUTTONS_ENABLED := "%s.undo_redo_buttons_enabled" % SETTINGS_PREFIX
 const SETTING_BREACH_ESCALATION_ENABLED := "%s.breach_escalation_enabled" % SETTINGS_PREFIX
 const SETTING_BREACH_ESCALATION_THRESHOLD := "%s.breach_escalation_threshold" % SETTINGS_PREFIX
 const SETTING_BREACH_DEESCALATION_ENABLED := "%s.breach_deescalation_enabled" % SETTINGS_PREFIX
@@ -92,6 +93,7 @@ const SETTINGS_KEYS := [
     SETTING_EXTRA_INPUTS_ENABLED,
     SETTING_GOTO_GROUP_BUTTON_ENABLED,
     SETTING_GOTO_NOTE_BUTTON_ENABLED,
+    SETTING_UNDO_REDO_BUTTONS_ENABLED,
     SETTING_BREACH_ESCALATION_ENABLED,
     SETTING_BREACH_ESCALATION_THRESHOLD,
     SETTING_BREACH_DEESCALATION_ENABLED,
@@ -172,6 +174,7 @@ func _init() -> void:
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/windows/window_group.gd")
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/windows/window_inventory.gd")
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/windows/window_bin.gd")
+        ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/windows/window_research_advanced.gd")
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/options_bar.gd")
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/camera_2d.gd")
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/tokens_tab.gd")
@@ -280,6 +283,13 @@ func _register_settings() -> void:
             "default": true,
             "label": "Go To Sticky Note Button",
             "description": "Show the Go To Sticky Note button near Undo/Redo in the tools bar.",
+            "category": "Quality of Life"
+        },
+        SETTING_UNDO_REDO_BUTTONS_ENABLED: {
+            "type": "bool",
+            "default": true,
+            "label": "Undo/Redo Toolbar Buttons",
+            "description": "Show Undo and Redo buttons in the tools bar.",
             "category": "Quality of Life"
         },
         SETTING_CONTEXT_RADIAL_ENABLED: {
@@ -767,6 +777,7 @@ func _init_features() -> void:
         SETTING_CONTROLLER_BLOCK_ENABLED: func(value): _controller_block.set_enabled(bool(value)),
         SETTING_GOTO_GROUP_BUTTON_ENABLED: func(value): if _goto_toolbar_buttons != null: _goto_toolbar_buttons.set_group_button_enabled(bool(value)),
         SETTING_GOTO_NOTE_BUTTON_ENABLED: func(value): if _goto_toolbar_buttons != null: _goto_toolbar_buttons.set_note_button_enabled(bool(value)),
+        SETTING_UNDO_REDO_BUTTONS_ENABLED: func(value): if _undo_redo != null: _undo_redo.set_buttons_enabled(bool(value)),
         SETTING_SCREENSHOT_ENABLED: func(value): _screenshot.set_enabled(bool(value)),
         SETTING_SCREENSHOT_QUALITY: func(value): _screenshot.set_quality(int(value)),
         SETTING_SCREENSHOT_FOLDER: func(value): _screenshot.set_screenshot_folder(str(value)),
