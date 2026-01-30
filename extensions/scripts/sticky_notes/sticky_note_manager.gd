@@ -95,7 +95,7 @@ func create_note(world_pos: Vector2, note_size: Vector2 = Vector2(250, 150)):
     note.set_note_id(note_id)
     note.position = world_pos
     note.size = note_size
-    note.set_manager(self)
+    note.set_manager(self )
     
     _connect_note_signals(note)
     
@@ -109,7 +109,7 @@ func create_note(world_pos: Vector2, note_size: Vector2 = Vector2(250, 150)):
     # Undo Command
     if _get_undo_manager():
         var cmd = StickyNoteCreatedCommandScript.new()
-        cmd.setup(self, note)
+        cmd.setup(self , note)
         _get_undo_manager().push_command(cmd)
     
     return note
@@ -135,7 +135,7 @@ func delete_note(note_id: String) -> void:
         # Undo Command
         if _get_undo_manager():
             var cmd = StickyNoteDeletedCommandScript.new()
-            cmd.setup(self, note_id, note_data)
+            cmd.setup(self , note_id, note_data)
             _get_undo_manager().push_command(cmd)
 
 func duplicate_note(note_id: String, new_position: Vector2):
@@ -220,7 +220,7 @@ func _on_note_drag_ended(note_id: String) -> void:
     if start_pos.distance_to(current_pos) > 1.0: # Threshold
         if _get_undo_manager():
             var cmd = StickyNoteMovedCommandScript.new()
-            cmd.setup(self, note_id, start_pos, current_pos)
+            cmd.setup(self , note_id, start_pos, current_pos)
             _get_undo_manager().push_command(cmd)
 
 func _on_note_selection_changed(selected: bool, note_id: String) -> void:
@@ -239,7 +239,7 @@ func _on_note_selection_changed(selected: bool, note_id: String) -> void:
             if str(before) != str(after):
                 if _get_undo_manager():
                     var cmd = StickyNoteChangedCommandScript.new()
-                    cmd.setup(self, note_id, before, after)
+                    cmd.setup(self , note_id, before, after)
                     _get_undo_manager().push_command(cmd)
 
 
@@ -293,17 +293,25 @@ func load_notes() -> void:
 func _create_note_from_data(data: Dictionary):
     if not _notes_container: return null
     var note = StickyNoteScript.new()
-    note.set_manager(self)
+    note.set_manager(self )
+    
+    # Set the note_id FIRST from data, before connecting signals
+    if data.has("id"):
+        note.set_note_id(data["id"])
+    
+    # Add note to dictionary BEFORE connecting signals and loading data
+    # This prevents save_notes() from being called with an empty dictionary
+    # when load_from_data() triggers note_changed signals
+    _notes[note.note_id] = note
     
     _connect_note_signals(note)
     
     # Add to tree first so _ready() builds UI elements
     _notes_container.add_child(note)
     
-    # Now load data (which calls update_color/update_pattern)
+    # Now load data (which calls update_color/update_pattern and may emit note_changed)
     note.load_from_data(data)
     
-    _notes[note.note_id] = note
     return note
 
 # ==============================================================================

@@ -57,8 +57,6 @@ func undo() -> bool:
         
     return false
 
-const MERGE_WINDOW_MS = 1000
-
 ## Merge with subsequent command
 func merge_with(other: RefCounted) -> bool:
     # Check if other is same type (we can't easily check class_name if it's script, but we can check script path or duck type)

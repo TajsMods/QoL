@@ -70,3 +70,60 @@ func _on_lock_pressed() -> void:
 			window.toggle_lock()
 	_update_lock_button()
 	Sound.play("click2")
+
+
+func _on_pause_pressed() -> void:
+	# Capture pause states before toggle for undo
+	var undo_manager = _get_undo_manager()
+	var before_states: Dictionary = {}
+	var pausable_windows: Array = []
+	
+	for window in Globals.selections:
+		if window.can_pause:
+			pausable_windows.append(window)
+			before_states[window.name] = window.paused if "paused" in window else false
+	
+	# Call parent to do the actual toggle
+	super._on_pause_pressed()
+	
+	# Capture pause states after toggle and record undo
+	if undo_manager != null and not before_states.is_empty():
+		var after_states: Dictionary = {}
+		for window in pausable_windows:
+			if is_instance_valid(window):
+				after_states[window.name] = window.paused if "paused" in window else false
+		
+		# Only record if states actually changed
+		var changed := false
+		for name in before_states:
+			if before_states[name] != after_states.get(name, before_states[name]):
+				changed = true
+				break
+		
+		if changed:
+			undo_manager.record_pause_change(before_states, after_states)
+
+
+func delete() -> void:
+	# Wrap multi-window deletion in a transaction for single undo
+	var undo_manager = _get_undo_manager()
+	var deletable_count := 0
+	for window in Globals.selections:
+		if window.can_delete and not window.closing:
+			deletable_count += 1
+	
+	var use_transaction := deletable_count > 1 and undo_manager != null
+	if use_transaction:
+		undo_manager.begin_action("Delete %d Windows" % deletable_count)
+	
+	super.delete()
+	
+	if use_transaction:
+		undo_manager.commit_action()
+
+
+func _get_undo_manager():
+	var core = Engine.get_meta("TajsCore", null)
+	if core != null and "undo_manager" in core:
+		return core.undo_manager
+	return null

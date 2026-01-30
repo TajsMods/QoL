@@ -434,6 +434,13 @@ func _get_group_nodes(group: WindowContainer) -> Array:
 func _delete_windows(windows: Array) -> void:
     if windows.is_empty():
         return
+    
+    # Wrap multi-window deletion in a transaction for single undo
+    var undo_manager = _get_undo_manager()
+    var use_transaction := windows.size() > 1 and undo_manager != null
+    if use_transaction:
+        undo_manager.begin_action("Delete %d Windows" % windows.size())
+    
     for window in windows:
         if not is_instance_valid(window):
             continue
@@ -442,6 +449,10 @@ func _delete_windows(windows: Array) -> void:
         if window.has_method("get") and window.get("closing"):
             continue
         window.propagate_call("close")
+    
+    if use_transaction:
+        undo_manager.commit_action()
+    
     if Globals != null:
         Globals.set_selection([], [], 0)
     _play_sound("close")

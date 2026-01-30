@@ -29,6 +29,8 @@ const ContextRadialFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/e
 const ContextMenuProviderScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/context_menu/context_menu_provider.gd")
 const GroupPatternsFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/group_patterns_feature.gd")
 const GroupLayerFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/group_layer_feature.gd")
+const UndoRedoFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/undo_redo_feature.gd")
+const GotoToolbarButtonsFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/goto_toolbar_buttons_feature.gd")
 const GotoGroupManagerScript = preload("res://mods-unpacked/TajemnikTV-Core/core/util/goto_group_manager.gd")
 const CoreColorPickerPanelScript = preload("res://mods-unpacked/TajemnikTV-Core/core/ui/color_picker_panel.gd")
 
@@ -37,6 +39,8 @@ const SETTING_WIRE_CLEAR_ENABLED := "%s.wire_clear_enabled" % SETTINGS_PREFIX
 const SETTING_WIRE_DROP_ENABLED := "%s.wire_drop_enabled" % SETTINGS_PREFIX
 const SETTING_DISABLE_SLIDER_SCROLL := "%s.disable_slider_scroll" % SETTINGS_PREFIX
 const SETTING_EXTRA_INPUTS_ENABLED := "%s.extra_inputs_enabled" % SETTINGS_PREFIX
+const SETTING_GOTO_GROUP_BUTTON_ENABLED := "%s.goto_group_button_enabled" % SETTINGS_PREFIX
+const SETTING_GOTO_NOTE_BUTTON_ENABLED := "%s.goto_note_button_enabled" % SETTINGS_PREFIX
 const SETTING_BREACH_ESCALATION_ENABLED := "%s.breach_escalation_enabled" % SETTINGS_PREFIX
 const SETTING_BREACH_ESCALATION_THRESHOLD := "%s.breach_escalation_threshold" % SETTINGS_PREFIX
 const SETTING_BREACH_DEESCALATION_ENABLED := "%s.breach_deescalation_enabled" % SETTINGS_PREFIX
@@ -86,6 +90,8 @@ const SETTINGS_KEYS := [
     SETTING_WIRE_DROP_ENABLED,
     SETTING_DISABLE_SLIDER_SCROLL,
     SETTING_EXTRA_INPUTS_ENABLED,
+    SETTING_GOTO_GROUP_BUTTON_ENABLED,
+    SETTING_GOTO_NOTE_BUTTON_ENABLED,
     SETTING_BREACH_ESCALATION_ENABLED,
     SETTING_BREACH_ESCALATION_THRESHOLD,
     SETTING_BREACH_DEESCALATION_ENABLED,
@@ -144,6 +150,8 @@ var _context_radial
 var _context_menu_provider
 var _group_patterns
 var _group_layer
+var _undo_redo
+var _goto_toolbar_buttons
 
 var _hud_ready: bool = false
 var _setting_handlers: Dictionary = {}
@@ -259,6 +267,20 @@ func _register_settings() -> void:
             "description": "Add extra input slots to Inventory and Bin windows.",
             "category": "Quality of Life",
             "requires_restart": true
+        },
+        SETTING_GOTO_GROUP_BUTTON_ENABLED: {
+            "type": "bool",
+            "default": true,
+            "label": "Go To Group Button",
+            "description": "Show the Go To Group button near Undo/Redo in the tools bar.",
+            "category": "Quality of Life"
+        },
+        SETTING_GOTO_NOTE_BUTTON_ENABLED: {
+            "type": "bool",
+            "default": true,
+            "label": "Go To Sticky Note Button",
+            "description": "Show the Go To Sticky Note button near Undo/Redo in the tools bar.",
+            "category": "Quality of Life"
         },
         SETTING_CONTEXT_RADIAL_ENABLED: {
             "type": "bool",
@@ -430,7 +452,7 @@ func _register_settings() -> void:
             "label": "Take Full Screenshot",
             "description": "Capture a full desktop screenshot.",
             "category": "Screenshots",
-            "action": Callable(self, "_on_screenshot_full"),
+            "action": Callable(self , "_on_screenshot_full"),
             "depends_on": {"key": SETTING_SCREENSHOT_ENABLED, "equals": true}
         },
         ACTION_SCREENSHOT_SELECTION: {
@@ -439,7 +461,7 @@ func _register_settings() -> void:
             "label": "Capture Selection",
             "description": "Capture only selected nodes.",
             "category": "Screenshots",
-            "action": Callable(self, "_on_screenshot_selection"),
+            "action": Callable(self , "_on_screenshot_selection"),
             "depends_on": {"key": SETTING_SCREENSHOT_ENABLED, "equals": true}
         },
         ACTION_SCREENSHOT_OPEN_FOLDER: {
@@ -448,7 +470,7 @@ func _register_settings() -> void:
             "label": "Open Screenshot Folder",
             "description": "Open the screenshot folder in your file explorer.",
             "category": "Screenshots",
-            "action": Callable(self, "_on_screenshot_folder")
+            "action": Callable(self , "_on_screenshot_folder")
         },
         ACTION_SCREENSHOT_CHANGE_FOLDER: {
             "type": "action",
@@ -456,7 +478,7 @@ func _register_settings() -> void:
             "label": "Change Screenshot Folder",
             "description": "Choose a new screenshot output folder.",
             "category": "Screenshots",
-            "action": Callable(self, "_change_screenshot_folder"),
+            "action": Callable(self , "_change_screenshot_folder"),
             "depends_on": {"key": SETTING_SCREENSHOT_ENABLED, "equals": true}
         },
         SETTING_WIRE_COLORS_ENABLED: {
@@ -474,7 +496,7 @@ func _register_settings() -> void:
             "category": "Visuals",
             "ui_control": "color_map",
             "color_options": WireColorsFeatureScript.CONFIGURABLE_WIRES,
-            "color_get": Callable(self, "_get_wire_color"),
+            "color_get": Callable(self , "_get_wire_color"),
             "depends_on": {"key": SETTING_WIRE_COLORS_ENABLED, "equals": true}
         },
         ACTION_RESET_WIRE_COLORS: {
@@ -483,7 +505,7 @@ func _register_settings() -> void:
             "label": "Reset Wire Colors",
             "description": "Reset all custom wire colors.",
             "category": "Visuals",
-            "action": Callable(self, "_reset_wire_colors"),
+            "action": Callable(self , "_reset_wire_colors"),
             "depends_on": {"key": SETTING_WIRE_COLORS_ENABLED, "equals": true}
         },
         SETTING_GLOW_ENABLED: {
@@ -698,6 +720,14 @@ func _init_features() -> void:
     _group_layer.setup(_core)
     add_child(_group_layer)
 
+    _undo_redo = UndoRedoFeatureScript.new()
+    _undo_redo.setup(_core)
+    add_child(_undo_redo)
+
+    _goto_toolbar_buttons = GotoToolbarButtonsFeatureScript.new()
+    _goto_toolbar_buttons.setup(_core)
+    add_child(_goto_toolbar_buttons)
+
     _goto_group_manager = GotoGroupManagerScript.new()
     if _goto_group_manager.has_method("setup"):
         _goto_group_manager.setup(_core)
@@ -706,8 +736,10 @@ func _init_features() -> void:
         _core.extend_globals("goto_group_manager", _goto_group_manager)
 
     _sticky_note_manager = StickyNoteManagerScript.new()
-    _sticky_note_manager.setup(_settings, get_tree(), self)
+    _sticky_note_manager.setup(_settings, get_tree(), self )
     add_child(_sticky_note_manager)
+    if _core != null and _core.has_method("extend_globals"):
+        _core.extend_globals("sticky_note_manager", _sticky_note_manager)
 
     _context_radial = ContextRadialFeatureScript.new()
     _context_radial.setup(_core)
@@ -733,6 +765,8 @@ func _init_features() -> void:
         SETTING_NOTIFICATION_HISTORY_ENABLED: func(value): _notification_history.set_enabled(bool(value)),
         SETTING_NOTIFICATION_HISTORY_MAX: func(value): _notification_history.set_max_entries(int(value)),
         SETTING_CONTROLLER_BLOCK_ENABLED: func(value): _controller_block.set_enabled(bool(value)),
+        SETTING_GOTO_GROUP_BUTTON_ENABLED: func(value): if _goto_toolbar_buttons != null: _goto_toolbar_buttons.set_group_button_enabled(bool(value)),
+        SETTING_GOTO_NOTE_BUTTON_ENABLED: func(value): if _goto_toolbar_buttons != null: _goto_toolbar_buttons.set_note_button_enabled(bool(value)),
         SETTING_SCREENSHOT_ENABLED: func(value): _screenshot.set_enabled(bool(value)),
         SETTING_SCREENSHOT_QUALITY: func(value): _screenshot.set_quality(int(value)),
         SETTING_SCREENSHOT_FOLDER: func(value): _screenshot.set_screenshot_folder(str(value)),
@@ -776,9 +810,9 @@ func _register_events() -> void:
     if _settings != null and not _settings.value_changed.is_connected(_on_setting_changed):
         _settings.value_changed.connect(_on_setting_changed)
     if _core.event_bus != null:
-        _core.event_bus.on("game.hud_ready", Callable(self, "_on_hud_ready"), self, true)
-        _core.event_bus.on("game.desktop_ready", Callable(self, "_on_desktop_ready"), self, true)
-        _core.event_bus.on("command_palette.ready", Callable(self, "_on_palette_ready"), self, true)
+        _core.event_bus.on("game.hud_ready", Callable(self , "_on_hud_ready"), self , true)
+        _core.event_bus.on("game.desktop_ready", Callable(self , "_on_desktop_ready"), self , true)
+        _core.event_bus.on("command_palette.ready", Callable(self , "_on_palette_ready"), self , true)
     if get_tree() != null and not get_tree().node_added.is_connected(_on_node_added):
         get_tree().node_added.connect(_on_node_added)
     call_deferred("_check_existing_hud")
@@ -849,7 +883,7 @@ func _register_keybinds() -> void:
         "Select All Nodes",
         [select_event],
         _core.keybinds.CONTEXT_GAMEPLAY,
-        Callable(self, "_on_select_all"),
+        Callable(self , "_on_select_all"),
         -1,
         KEYBIND_CATEGORY_ID
     )
@@ -859,7 +893,7 @@ func _register_keybinds() -> void:
         "Toggle Wire Drop Menu",
         [],
         _core.keybinds.CONTEXT_ANY,
-        Callable(self, "_on_wire_drop_toggle"),
+        Callable(self , "_on_wire_drop_toggle"),
         0,
         KEYBIND_CATEGORY_ID
     )
@@ -900,7 +934,7 @@ func _register_commands() -> void:
         "keywords": ["select", "all", "nodes"],
         "icon_path": "res://textures/icons/selection.png",
         "badge": "SAFE"
-    }, Callable(self, "_on_select_all"))
+    }, Callable(self , "_on_select_all"))
 
     _register_toggle_command(registry, "tajs_qol.toggle_smart_select", "Smart Selection", SETTING_SMART_SELECT_ENABLED, true, "res://textures/icons/selection.png", ["ctrl", "select"])
     _register_toggle_command(registry, "tajs_qol.toggle_wire_clear", "Wire Clear", SETTING_WIRE_CLEAR_ENABLED, true, "res://textures/icons/wire.png", ["wire", "clear", "disconnect"])
@@ -925,7 +959,7 @@ func _register_commands() -> void:
         "icon_path": "res://textures/icons/crosshair.png",
         "badge": "SAFE",
         "keep_open": true
-    }, Callable(self, "_on_goto_group"))
+    }, Callable(self , "_on_goto_group"))
 
     # Register "Notes" subcategory under "Tools"
     registry.register({
@@ -946,7 +980,7 @@ func _register_commands() -> void:
         "keywords": ["note", "sticky", "create", "add"],
         "icon_path": "res://textures/icons/document.png",
         "badge": "SAFE"
-    }, Callable(self, "_on_create_sticky_note"))
+    }, Callable(self , "_on_create_sticky_note"))
 
     registry.register_command("tajs_qol.goto_note", {
         "title": "Go To Note",
@@ -956,7 +990,7 @@ func _register_commands() -> void:
         "icon_path": "res://textures/icons/crosshair.png",
         "badge": "SAFE",
         "keep_open": true
-    }, Callable(self, "_on_goto_note"))
+    }, Callable(self , "_on_goto_note"))
 
     registry.register_command("tajs_qol.notifications.open", {
         "title": "Open Notification History",
@@ -966,7 +1000,7 @@ func _register_commands() -> void:
         "icon_path": "res://textures/icons/exclamation.png",
         "badge": "SAFE",
         "can_run": func(_ctx): return _notification_history != null and _settings.get_bool(SETTING_NOTIFICATION_HISTORY_ENABLED, true)
-    }, Callable(self, "_on_notification_open"))
+    }, Callable(self , "_on_notification_open"))
 
     registry.register_command("tajs_qol.notifications.clear", {
         "title": "Clear Notification History",
@@ -976,7 +1010,7 @@ func _register_commands() -> void:
         "icon_path": "res://textures/icons/exclamation.png",
         "badge": "SAFE",
         "can_run": func(_ctx): return _notification_history != null and _settings.get_bool(SETTING_NOTIFICATION_HISTORY_ENABLED, true)
-    }, Callable(self, "_on_notification_clear"))
+    }, Callable(self , "_on_notification_clear"))
 
     registry.register_command("tajs_qol.screenshot.full", {
         "title": "Take Screenshot",
@@ -986,7 +1020,7 @@ func _register_commands() -> void:
         "icon_path": "res://textures/icons/image.png",
         "badge": "SAFE",
         "can_run": func(_ctx): return _screenshot != null and _settings.get_bool(SETTING_SCREENSHOT_ENABLED, true)
-    }, Callable(self, "_on_screenshot_full"))
+    }, Callable(self , "_on_screenshot_full"))
 
     registry.register_command("tajs_qol.screenshot.selection", {
         "title": "Screenshot: Capture Selection",
@@ -996,7 +1030,7 @@ func _register_commands() -> void:
         "icon_path": "res://textures/icons/image.png",
         "badge": "SAFE",
         "can_run": func(_ctx): return _screenshot != null and _settings.get_bool(SETTING_SCREENSHOT_ENABLED, true) and Globals != null and not Globals.selections.is_empty()
-    }, Callable(self, "_on_screenshot_selection"))
+    }, Callable(self , "_on_screenshot_selection"))
 
     registry.register_command("tajs_qol.screenshot.folder", {
         "title": "Open Screenshot Folder",
@@ -1006,7 +1040,7 @@ func _register_commands() -> void:
         "icon_path": "res://textures/icons/folder.png",
         "badge": "SAFE",
         "can_run": func(_ctx): return _screenshot != null
-    }, Callable(self, "_on_screenshot_folder"))
+    }, Callable(self , "_on_screenshot_folder"))
 
 
 func _register_toggle_command(registry, command_id: String, label: String, setting_key: String, default_value: bool, icon_path: String, keywords: Array) -> void:
@@ -1018,7 +1052,7 @@ func _register_toggle_command(registry, command_id: String, label: String, setti
         "keywords": keywords,
         "icon_path": icon_path,
         "badge": "SAFE"
-    }, Callable(self, "_toggle_setting_command").bind(setting_key, default_value))
+    }, Callable(self , "_toggle_setting_command").bind(setting_key, default_value))
 
 
 func _format_toggle_title(label: String, setting_key: String, default_value: bool) -> String:
@@ -1051,6 +1085,8 @@ func _build_settings_ui(container: VBoxContainer) -> void:
     _bind_toggle(ui, container, "Wire Drop Menu", SETTING_WIRE_DROP_ENABLED, true, "Show a node picker when wires are dropped on empty canvas.")
     _bind_toggle(ui, container, "Disable Slider Scroll", SETTING_DISABLE_SLIDER_SCROLL, false, "Prevent mouse wheel from changing slider values.")
     _bind_toggle(ui, container, "Extra Input Slots", SETTING_EXTRA_INPUTS_ENABLED, false, "Add extra input slots to Inventory and Bin windows.")
+    _bind_toggle(ui, container, "Go To Group Button", SETTING_GOTO_GROUP_BUTTON_ENABLED, true, "Show the Go To Group button near Undo/Redo in the tools bar.")
+    _bind_toggle(ui, container, "Go To Sticky Note Button", SETTING_GOTO_NOTE_BUTTON_ENABLED, true, "Show the Go To Sticky Note button near Undo/Redo in the tools bar.")
 
     _bind_toggle(ui, container, "Mute on Focus Loss", SETTING_FOCUS_MUTE_ENABLED, true, "Lower volume when the game loses focus.")
     var volume_slider = ui.add_slider(container, "Background Volume", _settings.get_float(SETTING_FOCUS_BG_VOLUME, 0.0), 0.0, 100.0, 5.0, "%", func(v):

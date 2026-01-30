@@ -2,6 +2,8 @@ extends RefCounted
 
 const LOG_NAME := "TajemnikTV-QoL:WireColors"
 
+const WireColorChangedCommand = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/commands/wire_color_changed_command.gd")
+
 const CONFIGURABLE_WIRES := {
     "download_speed": "Download Speed",
     "upload_speed": "Upload Speed",
@@ -103,21 +105,35 @@ func refresh_original_colors() -> void:
     _refresh_connectors()
 
 
-func set_color(resource_id: String, color: Color) -> void:
+func set_color(resource_id: String, color: Color, push_undo: bool = true) -> void:
+    var before_hex := ""
+    if push_undo and _custom_hex.has(resource_id):
+        before_hex = _custom_hex[resource_id]
+    
     var hex = color.to_html(false)
     _custom_hex[resource_id] = hex
     _ensure_custom_connector(resource_id, hex)
     if _enabled and Data != null and Data.resources != null and Data.resources.has(resource_id):
         Data.resources[resource_id].color = "custom_" + resource_id
     _refresh_connectors()
+    
+    if push_undo:
+        _push_undo_command(resource_id, before_hex, hex)
 
 
-func reset_color(resource_id: String) -> void:
+func reset_color(resource_id: String, push_undo: bool = true) -> void:
+    var before_hex := ""
+    if push_undo and _custom_hex.has(resource_id):
+        before_hex = _custom_hex[resource_id]
+    
     if _custom_hex.has(resource_id):
         _custom_hex.erase(resource_id)
     if _original_colors.has(resource_id) and Data != null and Data.resources != null and Data.resources.has(resource_id):
         Data.resources[resource_id].color = _original_colors[resource_id]
     _refresh_connectors()
+    
+    if push_undo and not before_hex.is_empty():
+        _push_undo_command(resource_id, before_hex, "")
 
 
 func reset_all() -> void:
@@ -235,3 +251,17 @@ func _find_connector_buttons(node: Node) -> Array:
     for child in node.get_children():
         result.append_array(_find_connector_buttons(child))
     return result
+
+
+func _push_undo_command(resource_id: String, before_hex: String, after_hex: String) -> void:
+    if _core == null:
+        return
+    var undo_manager = _core.undo_manager if "undo_manager" in _core else null
+    if undo_manager == null or not undo_manager.is_enabled():
+        return
+    # Don't push if nothing actually changed
+    if before_hex == after_hex:
+        return
+    var cmd = WireColorChangedCommand.new()
+    cmd.setup(self, resource_id, before_hex, after_hex)
+    undo_manager.push_command(cmd)
