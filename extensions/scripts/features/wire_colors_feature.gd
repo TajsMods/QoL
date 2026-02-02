@@ -109,14 +109,14 @@ func set_color(resource_id: String, color: Color, push_undo: bool = true) -> voi
     var before_hex := ""
     if push_undo and _custom_hex.has(resource_id):
         before_hex = _custom_hex[resource_id]
-    
+
     var hex = color.to_html(false)
     _custom_hex[resource_id] = hex
     _ensure_custom_connector(resource_id, hex)
     if _enabled and Data != null and Data.resources != null and Data.resources.has(resource_id):
         Data.resources[resource_id].color = "custom_" + resource_id
     _refresh_connectors()
-    
+
     if push_undo:
         _push_undo_command(resource_id, before_hex, hex)
 
@@ -125,13 +125,13 @@ func reset_color(resource_id: String, push_undo: bool = true) -> void:
     var before_hex := ""
     if push_undo and _custom_hex.has(resource_id):
         before_hex = _custom_hex[resource_id]
-    
+
     if _custom_hex.has(resource_id):
         _custom_hex.erase(resource_id)
     if _original_colors.has(resource_id) and Data != null and Data.resources != null and Data.resources.has(resource_id):
         Data.resources[resource_id].color = _original_colors[resource_id]
     _refresh_connectors()
-    
+
     if push_undo and not before_hex.is_empty():
         _push_undo_command(resource_id, before_hex, "")
 
@@ -235,7 +235,7 @@ func _refresh_connectors() -> void:
                 if connector.pivot:
                     connector.pivot.self_modulate = target_color
                 connector.draw_update()
-    
+
     var windows = _tree.get_nodes_in_group("window")
     for window in windows:
         var buttons = _find_connector_buttons(window)

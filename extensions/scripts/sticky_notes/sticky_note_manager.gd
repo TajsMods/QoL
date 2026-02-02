@@ -37,7 +37,7 @@ var _note_edit_start_data: Dictionary = {} # note_id -> Dictionary
 func setup(config, _tree: SceneTree, mod_main = null) -> void:
     _config = config
     _mod_main = mod_main
-    
+
     # Try to initialize immediately, or defer if not ready
     if not _try_initialize():
         # Retry until desktop is available
@@ -55,18 +55,18 @@ func _deferred_init() -> void:
 func _try_initialize() -> bool:
     if not Globals or not is_instance_valid(Globals.desktop):
         return false
-    
+
     _desktop = Globals.desktop
-    
+
     _notes_container = Control.new()
     _notes_container.name = "StickyNotesContainer"
     _notes_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
     _notes_container.set_anchors_preset(Control.PRESET_FULL_RECT)
     _notes_container.z_index = 5
     _desktop.add_child(_notes_container)
-    
+
     load_notes()
-    
+
     _log("Sticky Note Manager initialized", true)
     return true
 
@@ -88,50 +88,50 @@ func create_note_at_camera_center():
 func create_note(world_pos: Vector2, note_size: Vector2 = Vector2(250, 150)):
     if not _notes_container:
         return null
-    
+
     var note = StickyNoteScript.new()
     var note_id = _generate_id()
-    
+
     note.set_note_id(note_id)
     note.position = world_pos
     note.size = note_size
     note.set_manager(self )
-    
+
     _connect_note_signals(note)
-    
+
     _notes_container.add_child(note)
     _notes[note_id] = note
-    
+
     save_notes()
     Signals.notify.emit("check", "Note created!")
     note_added.emit(note)
-    
+
     # Undo Command
     if _get_undo_manager():
         var cmd = StickyNoteCreatedCommandScript.new()
         cmd.setup(self , note)
         _get_undo_manager().push_command(cmd)
-    
+
     return note
 
 func delete_note(note_id: String) -> void:
     if not _notes.has(note_id):
         return
-    
+
     var note = _notes[note_id]
     var note_data = note.get_data() if is_instance_valid(note) else {}
-    
+
     _notes.erase(note_id)
-    
+
     if is_instance_valid(note):
         note.queue_free()
-    
+
     save_notes()
     Signals.notify.emit("check", "Note deleted")
-    
+
     if not note_data.is_empty():
         note_removed.emit(note_id, note_data)
-        
+
         # Undo Command
         if _get_undo_manager():
             var cmd = StickyNoteDeletedCommandScript.new()
@@ -141,35 +141,35 @@ func delete_note(note_id: String) -> void:
 func duplicate_note(note_id: String, new_position: Vector2):
     if not _notes.has(note_id):
         return null
-    
+
     var original = _notes[note_id]
     var data = original.get_data()
-    
+
     # We use _create_note_from_data directly to handle undo logic here manually if needed?
     # Or just use create_note and populate it?
     # create_note pushes a command. If we populate it after, that's a change command.
     # We want one command for "Duplicate".
-    # Implementation: Create blank note (pushes command), then set data (pushes command). 
+    # Implementation: Create blank note (pushes command), then set data (pushes command).
     # This creates 2 undo steps. Ideally one.
-    
+
     # Better: Create note without pushing command, then push specific "Created" command with full data.
     # But create_note pushes command.
-    
+
     # Let's just use create_note and accept 2 steps or combine them?
     # Actually, let's just make create_note take optional data?
-    
+
     # For now, simplistic approach:
     var new_note = create_note(new_position, original.size)
     if new_note:
         var dup_data = data.duplicate()
         dup_data.erase("id")
         dup_data.erase("position")
-        
+
         # This will trigger note_changed and push a change command
         new_note.load_from_data(dup_data)
-        
+
         Signals.notify.emit("check", "Note duplicated!")
-    
+
     return new_note
 
 func _generate_id() -> String:
@@ -213,10 +213,10 @@ func _on_note_drag_started(note_id: String) -> void:
 func _on_note_drag_ended(note_id: String) -> void:
     if not _notes.has(note_id) or not _note_drag_start_pos.has(note_id):
         return
-        
+
     var start_pos = _note_drag_start_pos[note_id]
     var current_pos = _notes[note_id].position
-    
+
     if start_pos.distance_to(current_pos) > 1.0: # Threshold
         if _get_undo_manager():
             var cmd = StickyNoteMovedCommandScript.new()
@@ -225,7 +225,7 @@ func _on_note_drag_ended(note_id: String) -> void:
 
 func _on_note_selection_changed(selected: bool, note_id: String) -> void:
     if not _notes.has(note_id): return
-    
+
     if selected:
         # Cache start state
         _note_edit_start_data[note_id] = _notes[note_id].get_data().duplicate()
@@ -234,7 +234,7 @@ func _on_note_selection_changed(selected: bool, note_id: String) -> void:
         if _note_edit_start_data.has(note_id):
             var before = _note_edit_start_data[note_id]
             var after = _notes[note_id].get_data()
-            
+
             # Check for differences
             if str(before) != str(after):
                 if _get_undo_manager():
@@ -249,7 +249,7 @@ func _get_undo_manager():
     # Access runtime -> undo_manager
     if core.has_method("get_runtime"):
         pass
-    
+
     # Better way: Use the same method as mod_main uses
     return core.undo_manager if core and "undo_manager" in core else null
 
@@ -279,12 +279,12 @@ func load_notes() -> void:
     var notes_data = _config.get_value(NOTES_KEY, [])
     _log("Loading notes, found %d entries" % (notes_data.size() if notes_data is Array else 0), true)
     if not notes_data is Array: notes_data = []
-    
+
     for note_id in _notes:
         var note = _notes[note_id]
         if is_instance_valid(note): note.queue_free()
     _notes.clear()
-    
+
     for data in notes_data:
         if data is Dictionary:
             _log("Loading note data: %s" % str(data), true)
@@ -294,24 +294,24 @@ func _create_note_from_data(data: Dictionary):
     if not _notes_container: return null
     var note = StickyNoteScript.new()
     note.set_manager(self )
-    
+
     # Set the note_id FIRST from data, before connecting signals
     if data.has("id"):
         note.set_note_id(data["id"])
-    
+
     # Add note to dictionary BEFORE connecting signals and loading data
     # This prevents save_notes() from being called with an empty dictionary
     # when load_from_data() triggers note_changed signals
     _notes[note.note_id] = note
-    
+
     _connect_note_signals(note)
-    
+
     # Add to tree first so _ready() builds UI elements
     _notes_container.add_child(note)
-    
+
     # Now load data (which calls update_color/update_pattern and may emit note_changed)
     note.load_from_data(data)
-    
+
     return note
 
 # ==============================================================================

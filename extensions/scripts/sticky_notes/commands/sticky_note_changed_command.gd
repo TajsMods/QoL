@@ -17,7 +17,7 @@ func setup(manager, note_id: String, before: Dictionary, after: Dictionary) -> v
     _before_data = before.duplicate()
     _after_data = after.duplicate()
     description = "Edit Sticky Note"
-    
+
     # Identify what changed
     _changed_keys = []
     for key in after.keys():
@@ -28,33 +28,33 @@ func setup(manager, note_id: String, before: Dictionary, after: Dictionary) -> v
         if not after.has(key):
             if not key in _changed_keys:
                 _changed_keys.append(key)
-                
+
     _changed_keys.sort()
 
 ## Execute (apply after data)
 func execute() -> bool:
     if not is_instance_valid(_manager):
         return false
-        
+
     var note = _manager._notes.get(_note_id)
     if is_instance_valid(note):
         note.load_from_data(_after_data)
         _manager.save_notes()
         return true
-        
+
     return false
 
 ## Undo (apply before data)
 func undo() -> bool:
     if not is_instance_valid(_manager):
         return false
-        
+
     var note = _manager._notes.get(_note_id)
     if is_instance_valid(note):
         note.load_from_data(_before_data)
         _manager.save_notes()
         return true
-        
+
     return false
 
 ## Merge with subsequent command
@@ -62,18 +62,18 @@ func merge_with(other: RefCounted) -> bool:
     # Check if other is same type (we can't easily check class_name if it's script, but we can check script path or duck type)
     if other.get_script() != get_script():
         return false
-        
+
     if other._note_id != _note_id:
         return false
-        
+
     # Check if same properties changed
     if _changed_keys != other._changed_keys:
         return false
-        
+
     # Time-based merge limit
     if timestamp - other.timestamp > MERGE_WINDOW_MS:
         return false
-        
+
     # Merge: Update my after_data to be other's after_data
     _after_data = other._after_data
     timestamp = other.timestamp

@@ -15,7 +15,7 @@ func setup(feature: RefCounted, resource_id: String, before_hex: String, after_h
     _resource_id = resource_id
     _before_hex = before_hex
     _after_hex = after_hex
-    
+
     # Generate a nice description
     var wire_name := resource_id.replace("_", " ").capitalize()
     if after_hex.is_empty():
@@ -29,7 +29,7 @@ func execute() -> bool:
     var feature = _feature_ref.get_ref()
     if feature == null:
         return false
-    
+
     if _after_hex.is_empty():
         feature.reset_color(_resource_id)
     else:
@@ -42,7 +42,7 @@ func undo() -> bool:
     var feature = _feature_ref.get_ref()
     if feature == null:
         return false
-    
+
     if _before_hex.is_empty():
         feature.reset_color(_resource_id)
     else:
@@ -54,15 +54,15 @@ func undo() -> bool:
 func merge_with(other: RefCounted) -> bool:
     if other.get_script() != get_script():
         return false
-    
+
     # Must be same resource
     if other._resource_id != _resource_id:
         return false
-    
+
     # Time-based merge limit
     if other.timestamp - timestamp > MERGE_WINDOW_MS:
         return false
-    
+
     # Merge: Update after_hex to be other's after_hex
     _after_hex = other._after_hex
     timestamp = other.timestamp

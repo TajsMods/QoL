@@ -84,6 +84,7 @@ const SETTING_HIDE_PURCHASED_TOKENS := "%s.hide_purchased_tokens" % SETTINGS_PRE
 const SETTING_HIDE_MAXED_UPGRADES := "%s.hide_maxed_upgrades" % SETTINGS_PREFIX
 const SETTING_HIDE_CLAIMED_REQUESTS := "%s.hide_claimed_requests" % SETTINGS_PREFIX
 const SETTING_CONTEXT_RADIAL_ENABLED := "%s.context_radial_enabled" % SETTINGS_PREFIX
+const SETTING_SCHEMATIC_LEGACY_VIEW := "%s.schematic_legacy_view" % SETTINGS_PREFIX
 
 const SETTINGS_KEYS := [
     SETTING_SMART_SELECT_ENABLED,
@@ -124,7 +125,8 @@ const SETTINGS_KEYS := [
     SETTING_GROUP_PATTERNS_ENABLED,
     SETTING_GROUP_COLOR_PICKER_ENABLED,
     SETTING_GROUP_PATTERNS_DATA,
-    SETTING_CONTEXT_RADIAL_ENABLED
+    SETTING_CONTEXT_RADIAL_ENABLED,
+    SETTING_SCHEMATIC_LEGACY_VIEW
 ]
 const StickyNoteManagerScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/sticky_notes/sticky_note_manager.gd")
 
@@ -185,6 +187,7 @@ func _init() -> void:
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/popup_schematic.gd")
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/edit_group_popup.gd")
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/schematic_container.gd")
+        ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/schematics_menu.gd")
     _core = _get_core()
     if _core == null:
         _log_warn("Taj's Core not found; QoL disabled.")
@@ -298,6 +301,13 @@ func _register_settings() -> void:
             "label": "Radial Context Menu (RMB)",
             "description": "Show a radial context menu when right-clicking on the desktop.",
             "category": "Quality of Life"
+        },
+        SETTING_SCHEMATIC_LEGACY_VIEW: {
+            "type": "bool",
+            "default": false,
+            "label": "Use Legacy Schematics Browser",
+            "description": "Show the original schematics list instead of the new library UI.",
+            "category": "UI"
         },
         SETTING_BREACH_ESCALATION_ENABLED: {
             "type": "bool",
