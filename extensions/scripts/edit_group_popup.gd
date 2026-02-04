@@ -41,10 +41,10 @@ func _ready() -> void:
 		edit_sticky_note_signal.connect(_on_edit_sticky_note)
 
 
-func set_node(node: WindowIndexed) -> void:
+func set_node(group_node: WindowIndexed) -> void:
 	_sticky_note = null
-	super.set_node(node)
-	_set_selected_icon(_normalize_icon_id(str(node.custom_icon)))
+	super.set_node(group_node)
+	_set_selected_icon(_normalize_icon_id(str(group_node.custom_icon)))
 
 
 func set_sticky_note(sticky: Control) -> void:
@@ -110,8 +110,8 @@ func _apply_layout() -> void:
 		confirm_btn.custom_minimum_size = BUTTON_SIZE_COMPACT if compact else BUTTON_SIZE
 		confirm_btn.add_theme_font_size_override("font_size", BUTTON_FONT_SIZE_COMPACT if compact else BUTTON_FONT_SIZE)
 	if _icon_preview:
-		var size := ICON_PREVIEW_SIZE_COMPACT if compact else ICON_PREVIEW_SIZE
-		_icon_preview.custom_minimum_size = Vector2(size, size)
+		var icon_size := ICON_PREVIEW_SIZE_COMPACT if compact else ICON_PREVIEW_SIZE
+		_icon_preview.custom_minimum_size = Vector2(icon_size, icon_size)
 	if _icon_change_btn:
 		_icon_change_btn.add_theme_font_size_override("font_size", BUTTON_FONT_SIZE_COMPACT if compact else BUTTON_FONT_SIZE)
 

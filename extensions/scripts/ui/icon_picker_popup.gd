@@ -8,15 +8,15 @@ extends Node
 const IconBrowserClass = preload("res://mods-unpacked/TajemnikTV-Core/core/ui/icon_browser.gd")
 
 static func open(options: Dictionary = {}, on_selected: Callable = Callable(), on_cancel: Callable = Callable()) -> bool:
-    var instance = _get_instance()
+    var instance: Variant = _get_instance()
     if instance == null:
         return false
     return instance._open(options, on_selected, on_cancel)
 
 
-static func _get_instance():
+static func _get_instance() -> Variant:
     if Engine.has_meta("TajsQolIconPicker"):
-        var existing = Engine.get_meta("TajsQolIconPicker")
+        var existing: Variant = Engine.get_meta("TajsQolIconPicker")
         if existing != null and existing.has_method("_open"):
             return existing
     var tree := Engine.get_main_loop()
@@ -28,7 +28,7 @@ static func _get_instance():
     var script_ref: Script = load("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/ui/icon_picker_popup.gd")
     if script_ref == null:
         return null
-    var instance = script_ref.new()
+    var instance: Variant = script_ref.new()
     instance.name = "TajsQolIconPicker"
     root.add_child(instance)
     Engine.set_meta("TajsQolIconPicker", instance)
@@ -170,10 +170,10 @@ func _apply_layout() -> void:
     if viewport == null:
         return
     var viewport_size := viewport.get_visible_rect().size
-    var ratio := _options.get("popup_size_ratio", Vector2(0.76, 0.72))
+    var ratio: Vector2 = _options.get("popup_size_ratio", Vector2(0.76, 0.72))
     var target_size := Vector2(viewport_size.x * ratio.x, viewport_size.y * ratio.y)
-    var min_size := _options.get("popup_min_size", Vector2(640, 480))
-    var max_size := _options.get("popup_max_size", Vector2(1100, 840))
+    var min_size: Vector2 = _options.get("popup_min_size", Vector2(640, 480))
+    var max_size: Vector2 = _options.get("popup_max_size", Vector2(1100, 840))
     var viewport_limit := viewport_size * 0.92
     min_size.x = min(min_size.x, viewport_limit.x)
     min_size.y = min(min_size.y, viewport_limit.y)

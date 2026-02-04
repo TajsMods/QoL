@@ -13,7 +13,7 @@ var _changed_keys: Array = []
 ## Setup the command
 func setup(group: Node, before: Dictionary, after: Dictionary) -> void:
 	_group_ref = weakref(group)
-	_group_name = group.name if group else "Unknown"
+	_group_name = str(group.name) if group != null else "Unknown"
 	_before_data = before.duplicate()
 	_after_data = after.duplicate()
 	description = "Edit Group Pattern"
@@ -110,8 +110,8 @@ func merge_with(other: RefCounted) -> bool:
 		return false
 	
 	# Must be same group
-	var my_group = _group_ref.get_ref()
-	var other_group = other._group_ref.get_ref()
+	var my_group: Variant = _group_ref.get_ref()
+	var other_group: Variant = other._group_ref.get_ref()
 	if my_group != other_group:
 		return false
 	

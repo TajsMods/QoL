@@ -49,9 +49,9 @@ func _ready() -> void:
 func update_icon() -> void:
     var tex := _resolve_icon_texture(custom_icon)
     if tex != null:
-        $TitlePanel / TitleContainer / Icon.texture = tex
+        $TitlePanel/TitleContainer/Icon.texture = tex
     else:
-        $TitlePanel / TitleContainer / Icon.texture = load(DEFAULT_ICON_PATH)
+        $TitlePanel/TitleContainer/Icon.texture = load(DEFAULT_ICON_PATH)
 
 
 func get_icon() -> String:
@@ -340,7 +340,7 @@ func _hide_color_picker_ui() -> void:
 
 func _open_pattern_picker() -> void:
     if _pattern_picker_layer:
-        _undo_before_state = GroupPatternChangedCommand.capture_state(self)
+        _undo_before_state = GroupPatternChangedCommand.capture_state(self )
         _pattern_picker.set_settings(pattern_index, pattern_color, pattern_alpha, pattern_spacing, pattern_thickness)
         _pattern_picker_layer.visible = true
         _pattern_picker.position = (_pattern_picker.get_viewport_rect().size - _pattern_picker.size) / 2
@@ -352,7 +352,7 @@ func _open_color_picker() -> bool:
         return false
     _setup_color_picker()
     if _color_picker_layer and _color_picker:
-        _undo_before_state = GroupPatternChangedCommand.capture_state(self)
+        _undo_before_state = GroupPatternChangedCommand.capture_state(self )
         _color_picker_layer.visible = true
         _color_picker.position = (_color_picker.get_viewport_rect().size - _color_picker.size) / 2
         Sound.play("click2")
@@ -436,21 +436,21 @@ func _find_nearest_vanilla_color_index(target: Color) -> int:
 
 
 func _load_from_settings() -> void:
-    var data = _get_group_data()
-    if data.is_empty():
+    var pattern_data = _get_group_data()
+    if pattern_data.is_empty():
         return
-    if data.has("pattern_index"):
-        pattern_index = int(data["pattern_index"])
-    if data.has("pattern_color"):
-        pattern_color = Color.html(str(data["pattern_color"]))
-    if data.has("pattern_alpha"):
-        pattern_alpha = float(data["pattern_alpha"])
-    if data.has("pattern_spacing"):
-        pattern_spacing = float(data["pattern_spacing"])
-    if data.has("pattern_thickness"):
-        pattern_thickness = float(data["pattern_thickness"])
-    if data.has("custom_color") and str(data["custom_color"]) != "":
-        custom_color = Color.html(str(data["custom_color"]))
+    if pattern_data.has("pattern_index"):
+        pattern_index = int(pattern_data["pattern_index"])
+    if pattern_data.has("pattern_color"):
+        pattern_color = Color.html(str(pattern_data["pattern_color"]))
+    if pattern_data.has("pattern_alpha"):
+        pattern_alpha = float(pattern_data["pattern_alpha"])
+    if pattern_data.has("pattern_spacing"):
+        pattern_spacing = float(pattern_data["pattern_spacing"])
+    if pattern_data.has("pattern_thickness"):
+        pattern_thickness = float(pattern_data["pattern_thickness"])
+    if pattern_data.has("custom_color") and str(pattern_data["custom_color"]) != "":
+        custom_color = Color.html(str(pattern_data["custom_color"]))
 
 
 func _save_to_settings() -> void:
@@ -533,12 +533,12 @@ func _push_pattern_undo_command() -> void:
     var undo_manager = core.undo_manager
     if undo_manager == null or not undo_manager.is_enabled():
         return
-    var after_state := GroupPatternChangedCommand.capture_state(self)
+    var after_state := GroupPatternChangedCommand.capture_state(self )
     # Only push if something actually changed
     if _undo_before_state == after_state:
         return
     var cmd = GroupPatternChangedCommand.new()
-    cmd.setup(self, _undo_before_state, after_state)
+    cmd.setup(self , _undo_before_state, after_state)
     undo_manager.push_command(cmd)
     _undo_before_state = after_state
 

@@ -26,7 +26,7 @@ func setup(core) -> void:
 	if _core == null:
 		return
 	if _core.event_bus != null:
-		_core.event_bus.on("game.desktop_ready", Callable(self, "_on_desktop_ready"), self, true)
+		_core.event_bus.on("game.desktop_ready", Callable(self , "_on_desktop_ready"), self , true)
 	call_deferred("_check_existing_desktop")
 
 
@@ -85,7 +85,7 @@ func _add_toolbar_buttons() -> void:
 			"GotoGroupButton",
 			GROUP_ICON_PATH,
 			"Go To Group",
-			Callable(self, "_on_goto_group_pressed"),
+			Callable(self , "_on_goto_group_pressed"),
 			group
 		)
 		tools_container.add_child(_group_button)
@@ -95,7 +95,7 @@ func _add_toolbar_buttons() -> void:
 			"GotoNoteButton",
 			NOTE_ICON_PATH,
 			"Go To Sticky Note",
-			Callable(self, "_on_goto_note_pressed"),
+			Callable(self , "_on_goto_note_pressed"),
 			group
 		)
 		tools_container.add_child(_note_button)
@@ -105,9 +105,9 @@ func _add_toolbar_buttons() -> void:
 	ModLoaderLog.success("Go To buttons added to tools bar", LOG_NAME)
 
 
-func _create_button(name: String, icon_path: String, tooltip: String, pressed_action: Callable, group: ButtonGroup) -> Button:
+func _create_button(btn_name: String, icon_path: String, tooltip: String, pressed_action: Callable, group: ButtonGroup) -> Button:
 	var button = Button.new()
-	button.name = name
+	button.name = btn_name
 
 	var img: Image = load(icon_path).get_image()
 	img.resize(35, 35, Image.INTERPOLATE_TRILINEAR)
@@ -181,10 +181,10 @@ func _play_sound(sound_id: String) -> void:
 		sound.call("play", sound_id)
 
 
-func _get_autoload(name: String) -> Node:
+func _get_autoload(autoload_name: String) -> Node:
 	if Engine.get_main_loop() == null:
 		return null
 	var root = Engine.get_main_loop().root
 	if root == null:
 		return null
-	return root.get_node_or_null(name)
+	return root.get_node_or_null(autoload_name)

@@ -19,7 +19,7 @@ var _icon_name_label: Label
 var _icon_change_btn: Button
 
 
-func _ready() -> void :
+func _ready() -> void:
 	super._ready()
 	_setup_icon_picker()
 	_apply_layout()
@@ -29,20 +29,20 @@ func _ready() -> void :
 			viewport.size_changed.connect(_on_viewport_resized)
 
 
-func hide() -> void :
+func hide() -> void:
 	super.hide()
 	_set_selected_icon(DEFAULT_ICON_ID)
 	_apply_layout()
 
 
-func set_icon(icon: int) -> void :
+func set_icon(icon: int) -> void:
 	icon_index = icon
 
 
-func _on_save_pressed() -> void :
+func _on_save_pressed() -> void:
 	data["icon"] = _selected_icon_id if _selected_icon_id != "" else DEFAULT_ICON_ID
 
-	var schem_name: String = $PortalContainer / MainPanel / InfoContainer / Label.text
+	var schem_name: String = $PortalContainer/MainPanel/InfoContainer/Label.text
 	if schem_name.is_empty():
 		schem_name = "Schematic"
 	Data.save_schematic(schem_name, data)
@@ -59,17 +59,17 @@ func _apply_layout() -> void:
 		return
 	var viewport_size := viewport.get_visible_rect().size
 	var compact := viewport_size.x <= COMPACT_VIEWPORT.x or viewport_size.y <= COMPACT_VIEWPORT.y
-	var cancel_btn := $PortalContainer / Buttons / Cancel
+	var cancel_btn := $PortalContainer/Buttons/Cancel
 	if cancel_btn:
 		cancel_btn.custom_minimum_size = BUTTON_SIZE_COMPACT if compact else BUTTON_SIZE
 		cancel_btn.add_theme_font_size_override("font_size", BUTTON_FONT_SIZE_COMPACT if compact else BUTTON_FONT_SIZE)
-	var save_btn := $PortalContainer / Buttons / Save
+	var save_btn := $PortalContainer/Buttons/Save
 	if save_btn:
 		save_btn.custom_minimum_size = BUTTON_SIZE_COMPACT if compact else BUTTON_SIZE
 		save_btn.add_theme_font_size_override("font_size", BUTTON_FONT_SIZE_COMPACT if compact else BUTTON_FONT_SIZE)
 	if _icon_preview:
-		var size := ICON_PREVIEW_SIZE_COMPACT if compact else ICON_PREVIEW_SIZE
-		_icon_preview.custom_minimum_size = Vector2(size, size)
+		var icon_size := ICON_PREVIEW_SIZE_COMPACT if compact else ICON_PREVIEW_SIZE
+		_icon_preview.custom_minimum_size = Vector2(icon_size, icon_size)
 	if _icon_change_btn:
 		_icon_change_btn.add_theme_font_size_override("font_size", BUTTON_FONT_SIZE_COMPACT if compact else BUTTON_FONT_SIZE)
 
@@ -80,11 +80,11 @@ func _gui_input(event: InputEvent) -> void:
 			accept_event()
 
 
-func _on_icon_button_pressed(_index: int) -> void :
+func _on_icon_button_pressed(_index: int) -> void:
 	pass
 
 
-func _on_save_schematic(schematic: Dictionary) -> void :
+func _on_save_schematic(schematic: Dictionary) -> void:
 	Signals.popup.emit("AddSchematic")
 	data = schematic
 	var saved_icon := str(schematic.get("icon", "blueprint"))
@@ -92,7 +92,7 @@ func _on_save_schematic(schematic: Dictionary) -> void :
 
 
 func _setup_icon_picker() -> void:
-	var info_container := $PortalContainer / MainPanel / InfoContainer
+	var info_container := $PortalContainer/MainPanel/InfoContainer
 	var icons_container := info_container.get_node_or_null("IconsContainer")
 	if icons_container != null:
 		icons_container.visible = false

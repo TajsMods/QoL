@@ -27,7 +27,7 @@ func load_meta(schematic: String) -> Dictionary:
 	var file := FileAccess.open(path, FileAccess.READ)
 	if file == null:
 		return {}
-	var parsed := JSON.parse_string(file.get_as_text())
+	var parsed: Variant = JSON.parse_string(file.get_as_text())
 	if parsed is Dictionary:
 		return _normalize_meta(parsed)
 	return {}
@@ -193,7 +193,7 @@ func _load_library_state() -> Dictionary:
 	var file := FileAccess.open(LIBRARY_STATE_PATH, FileAccess.READ)
 	if file == null:
 		return {}
-	var parsed := JSON.parse_string(file.get_as_text())
+	var parsed: Variant = JSON.parse_string(file.get_as_text())
 	if parsed is Dictionary:
 		return parsed
 	return {}

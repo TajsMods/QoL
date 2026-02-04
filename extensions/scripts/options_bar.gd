@@ -95,8 +95,8 @@ func _on_pause_pressed() -> void:
 		
 		# Only record if states actually changed
 		var changed := false
-		for name in before_states:
-			if before_states[name] != after_states.get(name, before_states[name]):
+		for window_name in before_states:
+			if before_states[window_name] != after_states.get(window_name, before_states[window_name]):
 				changed = true
 				break
 		

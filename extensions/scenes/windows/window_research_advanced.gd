@@ -39,6 +39,8 @@ func _ensure_eta_ui() -> void:
 
 	_eta_container = VBoxContainer.new()
 	_eta_container.name = "QolEtaContainer"
+	# layout_mode 0 = Use anchors directly (not in enum, suppress warning)
+	@warning_ignore("int_as_enum_without_cast", "int_as_enum_without_match")
 	_eta_container.layout_mode = 0
 	_eta_container.anchor_left = 1.0
 	_eta_container.anchor_right = 1.0
@@ -116,7 +118,9 @@ func _get_smoothed_speed() -> float:
 func _format_eta(seconds: float) -> String:
 	var clamped := minf(seconds, MAX_ETA_SECONDS)
 	var total := maxi(0, int(ceil(clamped)))
+	@warning_ignore("integer_division")
 	var hours := total / 3600
+	@warning_ignore("integer_division")
 	var minutes := (total % 3600) / 60
 	var secs := total % 60
 	if hours > 0:

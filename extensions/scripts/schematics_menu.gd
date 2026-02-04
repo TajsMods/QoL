@@ -766,8 +766,8 @@ func _refresh_library() -> void:
 func _reload_categories() -> void:
     _library_categories = _metadata_store.get_categories()
     var recovered: Array[String] = []
-    for name in Data.schematics.keys():
-        var meta: Dictionary = _get_meta(name, Data.schematics[name])
+    for schematic_name in Data.schematics.keys():
+        var meta: Dictionary = _get_meta(schematic_name, Data.schematics[schematic_name])
         var category := _get_category(meta)
         if category != "" and not _library_categories.has(category) and not recovered.has(category):
             recovered.append(category)
@@ -869,8 +869,8 @@ func _build_category_counts() -> Dictionary:
     }
     for category in _library_categories:
         counts[category] = 0
-    for name in Data.schematics.keys():
-        var meta: Dictionary = _get_meta(name, Data.schematics[name])
+    for schematic_name in Data.schematics.keys():
+        var meta: Dictionary = _get_meta(schematic_name, Data.schematics[schematic_name])
         var category := _get_category(meta)
         if category == "":
             counts[UNCATEGORIZED] = int(counts.get(UNCATEGORIZED, 0)) + 1
@@ -881,8 +881,8 @@ func _build_category_counts() -> Dictionary:
 
 func _collect_tags_from_library() -> Array[String]:
     var tag_set: Dictionary = {}
-    for name in Data.schematics.keys():
-        var meta: Dictionary = _get_meta(name, Data.schematics[name])
+    for schematic_name in Data.schematics.keys():
+        var meta: Dictionary = _get_meta(schematic_name, Data.schematics[schematic_name])
         for tag in _get_tags(meta):
             tag_set[tag] = true
     var tags: Array[String] = []
@@ -896,9 +896,9 @@ func _rebuild_visible_names() -> void:
     _visible_names.clear()
     var query := _search_input.text.strip_edges().to_lower()
 
-    for name in Data.schematics.keys():
-        var data: Dictionary = Data.schematics[name]
-        var meta: Dictionary = _get_meta(name, data)
+    for schematic_name in Data.schematics.keys():
+        var data: Dictionary = Data.schematics[schematic_name]
+        var meta: Dictionary = _get_meta(schematic_name, data)
 
         if _selected_category != ALL_CATEGORIES:
             var category := _get_category(meta)
@@ -919,11 +919,11 @@ func _rebuild_visible_names() -> void:
                 continue
 
         if query != "":
-            var hay: String = (name + " " + str(meta.get("description", "")) + " " + str(meta.get("notes", "")) + " " + ", ".join(_get_tags(meta))).to_lower()
+            var hay: String = (schematic_name + " " + str(meta.get("description", "")) + " " + str(meta.get("notes", "")) + " " + ", ".join(_get_tags(meta))).to_lower()
             if hay.find(query) == -1:
                 continue
 
-        _visible_names.append(name)
+        _visible_names.append(schematic_name)
 
     _sort_visible_names()
 
@@ -952,38 +952,38 @@ func _rebuild_rows() -> void:
     _clear_children(_list_rows)
     _row_nodes.clear()
 
-    for name in _visible_names:
-        var data: Dictionary = Data.schematics[name]
-        var meta: Dictionary = _get_meta(name, data)
+    for schematic_name in _visible_names:
+        var data: Dictionary = Data.schematics[schematic_name]
+        var meta: Dictionary = _get_meta(schematic_name, data)
         var stats := _compute_stats(data)
         var category := _get_category(meta)
         if category == "":
             category = UNCATEGORIZED
-        var modified := _format_short_date(_metadata_store.get_schematic_modified_time(name))
+        var modified := _format_short_date(_metadata_store.get_schematic_modified_time(schematic_name))
         var row := SchematicListRowScript.new()
-        row.setup(_get_preview_texture(data), name, "Nodes: %d | %s, Modified: %s" % [int(stats.get("node_count", 0)), category, modified], _get_status(meta))
-        row.pressed.connect(_on_row_pressed.bind(name))
+        row.setup(_get_preview_texture(data), schematic_name, "Nodes: %d | %s, Modified: %s" % [int(stats.get("node_count", 0)), category, modified], _get_status(meta))
+        row.pressed.connect(_on_row_pressed.bind(schematic_name))
         _list_rows.add_child(row)
-        _row_nodes[name] = row
-        if name == _selected_name:
+        _row_nodes[schematic_name] = row
+        if schematic_name == _selected_name:
             row.set_pressed_no_signal(true)
 
 
-func _select_schematic(name: String) -> void:
-    if name == "" or not Data.schematics.has(name):
+func _select_schematic(schematic_name: String) -> void:
+    if schematic_name == "" or not Data.schematics.has(schematic_name):
         _update_details("")
         return
-    _selected_name = name
+    _selected_name = schematic_name
     for key in _row_nodes.keys():
         var button: Button = _row_nodes[key]
-        button.set_pressed_no_signal(key == name)
-    _update_details(name)
+        button.set_pressed_no_signal(key == schematic_name)
+    _update_details(schematic_name)
 
 
-func _update_details(name: String) -> void:
+func _update_details(schematic_name: String) -> void:
     _suppress_detail_events = true
 
-    if name == "" or not Data.schematics.has(name):
+    if schematic_name == "" or not Data.schematics.has(schematic_name):
         _clear_children(_detail_category_chips)
         _detail_name.text = "Select a schematic"
         (_detail_badge as Object).set_status("WIP")
@@ -1001,12 +1001,12 @@ func _update_details(name: String) -> void:
         _suppress_detail_events = false
         return
 
-    var data: Dictionary = Data.schematics[name]
-    var meta: Dictionary = _get_meta(name, data)
+    var data: Dictionary = Data.schematics[schematic_name]
+    var meta: Dictionary = _get_meta(schematic_name, data)
     var stats := _compute_stats(data)
-    var preflight := _compute_preflight(name, stats)
+    var preflight := _compute_preflight(schematic_name, stats)
 
-    _detail_name.text = name
+    _detail_name.text = schematic_name
     (_detail_badge as Object).set_status(_get_status(meta))
     _detail_preview.texture = _get_preview_texture(data)
     _detail_stats.text = "Nodes: %d | Resources: %d | Links: %d" % [int(stats.get("node_count", 0)), int(stats.get("resource_count", 0)), int(stats.get("link_count", 0))]
@@ -1086,8 +1086,8 @@ func _on_delete_selected_category_pressed() -> void:
 func _delete_category_everywhere(category: String) -> void:
     if not _metadata_store.remove_category(category):
         return
-    for name in Data.schematics.keys():
-        var meta: Dictionary = _get_meta(name, Data.schematics[name])
+    for schematic_name in Data.schematics.keys():
+        var meta: Dictionary = _get_meta(schematic_name, Data.schematics[schematic_name])
         var categories: Array[String] = meta.get("categories", [])
         var changed := false
         while categories.has(category):
@@ -1095,7 +1095,7 @@ func _delete_category_everywhere(category: String) -> void:
             changed = true
         if changed:
             meta["categories"] = categories
-            _save_meta(name, meta)
+            _save_meta(schematic_name, meta)
     if _selected_category == category:
         _selected_category = ALL_CATEGORIES
     _refresh_library()
@@ -1119,8 +1119,8 @@ func _on_tag_pool_input(event: InputEvent, tag: String) -> void:
     _refresh_library()
 
 
-func _on_row_pressed(name: String) -> void:
-    _select_schematic(name)
+func _on_row_pressed(schematic_name: String) -> void:
+    _select_schematic(schematic_name)
 
 
 func _on_add_tag_submitted(text: String) -> void:
@@ -1253,11 +1253,11 @@ func _on_duplicate_pressed() -> void:
     var before: Array = Data.schematics.keys()
     Data.save_schematic(_selected_name + " Copy", data)
     var after: Array = Data.schematics.keys()
-    for name in after:
-        if not before.has(name):
-            meta_copy["name"] = name
-            _save_meta(name, meta_copy)
-            _selected_name = name
+    for schematic_name in after:
+        if not before.has(schematic_name):
+            meta_copy["name"] = schematic_name
+            _save_meta(schematic_name, meta_copy)
+            _selected_name = schematic_name
             break
     _refresh_library()
 
@@ -1272,24 +1272,24 @@ func _on_export_pressed() -> void:
 func _on_delete_pressed() -> void:
     if _selected_name == "":
         return
-    var name := _selected_name
+    var schematic_to_delete := _selected_name
     Signals.prompt.emit("prompt_delete_schematic", "prompt_delete_schematic_desc", func() -> void:
-        Data.delete_schematic(name)
+        Data.delete_schematic(schematic_to_delete)
     )
 
 
-func _save_meta(name: String, meta: Dictionary) -> void:
+func _save_meta(schematic_name: String, meta: Dictionary) -> void:
     meta["status"] = _normalize_status(str(meta.get("status", "WIP")))
-    _meta_cache[name] = meta
-    _metadata_store.save_meta(name, meta)
+    _meta_cache[schematic_name] = meta
+    _metadata_store.save_meta(schematic_name, meta)
 
 
-func _get_meta(name: String, data: Dictionary) -> Dictionary:
-    if _meta_cache.has(name):
-        return _meta_cache[name]
-    var meta: Dictionary = _metadata_store.ensure_meta(name, data)
+func _get_meta(schematic_name: String, schematic_data: Dictionary) -> Dictionary:
+    if _meta_cache.has(schematic_name):
+        return _meta_cache[schematic_name]
+    var meta: Dictionary = _metadata_store.ensure_meta(schematic_name, schematic_data)
     meta["status"] = _normalize_status(str(meta.get("status", "WIP")))
-    _meta_cache[name] = meta
+    _meta_cache[schematic_name] = meta
     return meta
 
 
@@ -1468,12 +1468,12 @@ func _apply_layout() -> void:
 
 func _commit_layout() -> void:
     set_anchors_preset(Control.PRESET_FULL_RECT)
-    var size := get_viewport().get_visible_rect().size
-    var side := clamp(size.x * 0.018, 16.0, 46.0)
-    var top := clamp(size.y * 0.018, 14.0, 34.0)
-    var bottom := clamp(size.y * 0.13, 100.0, 170.0)
+    var viewport_size := get_viewport().get_visible_rect().size
+    var side: float = clamp(viewport_size.x * 0.018, 16.0, 46.0)
+    var top: float = clamp(viewport_size.y * 0.018, 14.0, 34.0)
+    var bottom: float = clamp(viewport_size.y * 0.13, 100.0, 170.0)
     if _search_wrap != null:
-        var search_width := clamp(size.x * 0.40, 520.0, 860.0)
+        var search_width: float = clamp(viewport_size.x * 0.40, 520.0, 860.0)
         _search_wrap.custom_minimum_size.x = search_width
     offset_left = side
     offset_top = top

@@ -19,8 +19,8 @@ func _init() -> void:
 	_build()
 
 
-func setup(icon: Texture2D, schematic_name: String, meta: String, status: String) -> void:
-	_icon.texture = icon
+func setup(icon_texture: Texture2D, schematic_name: String, meta: String, status: String) -> void:
+	_icon.texture = icon_texture
 	_name_label.text = schematic_name
 	_meta_label.text = meta
 	if _badge != null:
@@ -35,13 +35,13 @@ func _build() -> void:
 	# Hover effect - slightly brighter
 	var hover := _build_style(Color(0.12, 0.16, 0.24, 0.95), Color(0.38, 0.50, 0.70, 0.85), 1)
 	# Selected/pressed state - blue tint with prominent border
-	var pressed := _build_style(Color(0.14, 0.20, 0.30, 1.0), Color(0.50, 0.70, 1.0, 1.0), 2)
-	pressed.shadow_color = Color(0.45, 0.65, 1.0, 0.2)
-	pressed.shadow_size = 4
+	var pressed_style := _build_style(Color(0.14, 0.20, 0.30, 1.0), Color(0.50, 0.70, 1.0, 1.0), 2)
+	pressed_style.shadow_color = Color(0.45, 0.65, 1.0, 0.2)
+	pressed_style.shadow_size = 4
 	add_theme_stylebox_override("normal", base)
 	add_theme_stylebox_override("hover", hover)
-	add_theme_stylebox_override("pressed", pressed)
-	add_theme_stylebox_override("focus", pressed)
+	add_theme_stylebox_override("pressed", pressed_style)
+	add_theme_stylebox_override("focus", pressed_style)
 
 	var row := HBoxContainer.new()
 	row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
