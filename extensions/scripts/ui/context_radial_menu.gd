@@ -1,8 +1,3 @@
-# ==============================================================================
-# Taj's QoL - Context Radial Menu
-# Author: TajemnikTV
-# Description: Radial menu UI with subcategories.
-# ==============================================================================
 extends CanvasLayer
 
 signal action_selected(action: Dictionary)
@@ -151,8 +146,8 @@ func _render_current() -> void:
         var action: Dictionary = items[i]
         var item := _create_item(action)
         var angle := -PI / 2 + TAU * float(i) / float(count)
-        var offset := Vector2(cos(angle), sin(angle)) * radius
-        item.position = _center_pos + offset - item.size / 2
+        var item_offset := Vector2(cos(angle), sin(angle)) * radius
+        item.position = _center_pos + item_offset - item.size / 2
         _root.add_child(item)
         _items.append(item)
 

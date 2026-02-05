@@ -1,8 +1,3 @@
-# ==============================================================================
-# Taj's QoL - Rich Text Context Menu
-# Custom styled context menu for text formatting
-# Ported from TajsModded
-# ==============================================================================
 extends PanelContainer
 class_name TajsStickyNoteRichTextContextMenu
 
@@ -128,7 +123,7 @@ func _add_submenu_item(label_text: String, callback: String) -> Button:
     _apply_button_style(btn)
     
     btn.set_meta("submenu_callback", callback)
-    btn.mouse_entered.connect(Callable(self, callback).bind(btn))
+    btn.mouse_entered.connect(Callable(self , callback).bind(btn))
     
     _items_container.add_child(btn)
     return btn
@@ -316,7 +311,7 @@ func show_at(global_pos: Vector2, has_selection: bool = false, tree_ref: SceneTr
     # Ensure we're in the tree
     if not is_inside_tree():
         if tree_ref:
-            tree_ref.root.add_child(self)
+            tree_ref.root.add_child(self )
         else:
             push_error("RichTextContextMenu: Cannot show menu - not in tree and no tree_ref provided")
             return

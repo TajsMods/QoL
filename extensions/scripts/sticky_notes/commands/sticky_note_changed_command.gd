@@ -1,7 +1,3 @@
-# ==============================================================================
-# Taj's QoL - StickyNoteChangedCommand
-# Undoable command for sticky note property changes
-# ==============================================================================
 extends "res://mods-unpacked/TajemnikTV-Core/core/commands/undo/undo_command.gd"
 
 var _manager = null

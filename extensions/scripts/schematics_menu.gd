@@ -1,3 +1,4 @@
+class_name TajsQoLSchematicsMenu
 extends "res://scripts/schematics_menu.gd"
 
 const MetadataStoreScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/schematic_library/metadata_store.gd")
@@ -5,6 +6,7 @@ const SchematicListRowScript = preload("res://mods-unpacked/TajemnikTV-QoL/exten
 const StatusBadgeScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/schematic_library/ui/status_badge.gd")
 const TagChipScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/schematic_library/ui/tag_chip.gd")
 const ToggleSwitchScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/schematic_library/ui/toggle_switch.gd")
+const IconPickerPopupScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/ui/icon_picker_popup.gd")
 
 const LEGACY_SETTING_KEY := "tajs_qol.schematic_legacy_view"
 const DEFAULT_ICON_PATH := "res://textures/icons/blueprint.png"
@@ -58,7 +60,14 @@ var _detail_status: OptionButton
 var _place_button: Button
 var _duplicate_button: Button
 var _export_button: Button
+var _edit_button: Button
 var _delete_button: Button
+
+var _edit_dialog: AcceptDialog
+var _edit_name_input: LineEdit
+var _edit_icon_button: Button
+var _edit_icon_preview: TextureRect
+var _edit_icon_id: String = "blueprint"
 
 var _selected_name: String = ""
 var _visible_names: Array[String] = []
@@ -193,6 +202,7 @@ func _build_ui() -> void:
     _build_filters_column()
     _build_library_column()
     _build_details_column()
+    _build_edit_dialog()
 
 
 func _build_toolbar_left(parent: HBoxContainer) -> void:
@@ -297,17 +307,27 @@ func _build_filters_column() -> void:
     box.add_theme_constant_override("separation", 8)
     panel.add_child(box)
 
-    box.add_child(_build_section_title("FILTERS"))
-    box.add_child(_build_section_divider())
+    var filters_head := HBoxContainer.new()
+    filters_head.add_theme_constant_override("separation", 8)
+    box.add_child(filters_head)
+
+    var filters_title := _build_section_title("FILTERS")
+    filters_head.add_child(filters_title)
+
+    var filters_spacer := Control.new()
+    filters_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    filters_head.add_child(filters_spacer)
 
     _clear_filters_button = Button.new()
-    _clear_filters_button.text = "Clear filters"
+    _clear_filters_button.text = "Clear"
     _clear_filters_button.visible = false
     _clear_filters_button.focus_mode = Control.FOCUS_NONE
-    _clear_filters_button.custom_minimum_size = Vector2(0, 34)
+    _clear_filters_button.custom_minimum_size = Vector2(78, 34)
     _clear_filters_button.add_theme_font_size_override("font_size", 16)
     _clear_filters_button.pressed.connect(_on_clear_filters_pressed)
-    box.add_child(_clear_filters_button)
+    filters_head.add_child(_clear_filters_button)
+
+    box.add_child(_build_section_divider())
 
     var category_head := HBoxContainer.new()
     box.add_child(category_head)
@@ -348,18 +368,12 @@ func _build_filters_column() -> void:
     )
     box.add_child(_category_create_input)
 
-    var category_scroll := ScrollContainer.new()
-    category_scroll.custom_minimum_size = Vector2(0, 272)
-    category_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-    category_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    category_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-    box.add_child(category_scroll)
-
     _category_list = VBoxContainer.new()
+    _category_list.custom_minimum_size = Vector2(0, 272)
     _category_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    _category_list.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+    _category_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
     _category_list.add_theme_constant_override("separation", 4)
-    category_scroll.add_child(_category_list)
+    box.add_child(_category_list)
 
     box.add_child(_build_section_divider())
 
@@ -580,6 +594,10 @@ func _build_details_column() -> void:
     _detail_category_select.item_selected.connect(_on_detail_category_selected)
     category_row.add_child(_detail_category_select)
 
+    box.add_child(_build_section_divider())
+
+    box.add_child(_build_section_title("STATUS"))
+
     _detail_status = OptionButton.new()
     for option in STATUS_OPTIONS:
         _detail_status.add_item(option)
@@ -599,6 +617,8 @@ func _build_details_column() -> void:
     _detail_desc.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
     _detail_desc.text_changed.connect(_on_desc_changed)
     box.add_child(_detail_desc)
+
+    box.add_child(_build_section_divider())
 
     box.add_child(_build_section_title("PRIVATE NOTES"))
 
@@ -635,6 +655,14 @@ func _build_details_column() -> void:
     _duplicate_button.add_theme_font_size_override("font_size", 24)
     _duplicate_button.pressed.connect(_on_duplicate_pressed)
     action_row.add_child(_duplicate_button)
+
+    _edit_button = Button.new()
+    _edit_button.text = "Edit"
+    _edit_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    _edit_button.custom_minimum_size = Vector2(0, 44)
+    _edit_button.add_theme_font_size_override("font_size", 24)
+    _edit_button.pressed.connect(_on_edit_pressed)
+    action_row.add_child(_edit_button)
 
     _export_button = Button.new()
     _export_button.text = "Export"
@@ -718,6 +746,52 @@ func _build_section_divider() -> HSeparator:
     var separator := HSeparator.new()
     separator.add_theme_color_override("separator", Color(0.30, 0.42, 0.60, 0.8))
     return separator
+
+
+func _build_edit_dialog() -> void:
+    _edit_dialog = AcceptDialog.new()
+    _edit_dialog.title = "Edit Schematic"
+    _edit_dialog.dialog_hide_on_ok = true
+    _edit_dialog.min_size = Vector2i(520, 220)
+    _edit_dialog.confirmed.connect(_on_edit_dialog_confirmed)
+    add_child(_edit_dialog)
+
+    var ok_button := _edit_dialog.get_ok_button()
+    if ok_button != null:
+        ok_button.text = "Save"
+
+    var body := VBoxContainer.new()
+    body.add_theme_constant_override("separation", 8)
+    _edit_dialog.add_child(body)
+
+    var name_label := Label.new()
+    name_label.text = "Title"
+    body.add_child(name_label)
+
+    _edit_name_input = LineEdit.new()
+    _edit_name_input.placeholder_text = "Schematic title"
+    _edit_name_input.custom_minimum_size = Vector2(0, 36)
+    body.add_child(_edit_name_input)
+
+    var icon_label := Label.new()
+    icon_label.text = "Icon"
+    body.add_child(icon_label)
+
+    var icon_row := HBoxContainer.new()
+    icon_row.add_theme_constant_override("separation", 8)
+    body.add_child(icon_row)
+
+    _edit_icon_preview = TextureRect.new()
+    _edit_icon_preview.custom_minimum_size = Vector2(42, 42)
+    _edit_icon_preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+    _edit_icon_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+    icon_row.add_child(_edit_icon_preview)
+
+    _edit_icon_button = Button.new()
+    _edit_icon_button.text = "Choose Icon"
+    _edit_icon_button.custom_minimum_size = Vector2(0, 36)
+    _edit_icon_button.pressed.connect(_on_edit_pick_icon_pressed)
+    icon_row.add_child(_edit_icon_button)
 
 
 func _build_category_chip(text: String) -> PanelContainer:
@@ -1059,6 +1133,7 @@ func _rebuild_detail_category_dropdown(selected: String) -> void:
 func _set_actions_enabled(enabled: bool) -> void:
     _place_button.disabled = not enabled
     _duplicate_button.disabled = not enabled
+    _edit_button.disabled = not enabled
     _export_button.disabled = not enabled
     _delete_button.disabled = not enabled
 
@@ -1245,6 +1320,100 @@ func _on_place_pressed() -> void:
     Sound.play("click2")
 
 
+func _on_edit_pressed() -> void:
+    if _selected_name == "" or not Data.schematics.has(_selected_name):
+        return
+    var data: Dictionary = Data.schematics[_selected_name]
+    _edit_name_input.text = _selected_name
+    _edit_icon_id = str(data.get("icon", "blueprint"))
+    _edit_icon_preview.texture = _resolve_icon_texture(_edit_icon_id)
+    if _edit_icon_preview.texture == null and ResourceLoader.exists(DEFAULT_ICON_PATH):
+        _edit_icon_preview.texture = load(DEFAULT_ICON_PATH)
+    _edit_dialog.popup_centered(Vector2i(560, 240))
+    _edit_name_input.grab_focus()
+    _edit_name_input.select_all()
+
+
+func _on_edit_pick_icon_pressed() -> void:
+    IconPickerPopupScript.open(
+        {
+            "title": "Pick Schematic Icon",
+            "initial_selected_id": _edit_icon_id
+        },
+        Callable(self , "_on_edit_icon_selected")
+    )
+
+
+func _on_edit_icon_selected(icon_id: Variant, _entry: Variant) -> void:
+    var cleaned_icon := str(icon_id).strip_edges()
+    if cleaned_icon == "":
+        return
+    _edit_icon_id = cleaned_icon
+    _edit_icon_preview.texture = _resolve_icon_texture(_edit_icon_id)
+    if _edit_icon_preview.texture == null and ResourceLoader.exists(DEFAULT_ICON_PATH):
+        _edit_icon_preview.texture = load(DEFAULT_ICON_PATH)
+
+
+func _on_edit_dialog_confirmed() -> void:
+    if _selected_name == "" or not Data.schematics.has(_selected_name):
+        return
+    var target_name := _sanitize_schematic_name(_edit_name_input.text)
+    if target_name == "":
+        target_name = _selected_name
+    _commit_schematic_edit(_selected_name, target_name, _edit_icon_id)
+
+
+func _commit_schematic_edit(old_name: String, target_name: String, icon_id: String) -> void:
+    if not Data.schematics.has(old_name):
+        return
+    var edited_data: Dictionary = Data.schematics[old_name].duplicate(true)
+    edited_data["icon"] = icon_id
+    var old_meta: Dictionary = _get_meta(old_name, Data.schematics[old_name]).duplicate(true)
+
+    if target_name == old_name:
+        _write_schematic_file(old_name, edited_data)
+        Data.schematics[old_name] = edited_data
+        old_meta["name"] = old_name
+        _save_meta(old_name, old_meta)
+        _refresh_library()
+        _select_schematic(old_name)
+        return
+
+    var before: Array = Data.schematics.keys()
+    Data.save_schematic(target_name, edited_data)
+    var new_name := target_name
+    for key in Data.schematics.keys():
+        if not before.has(key):
+            new_name = key
+            break
+    old_meta["name"] = new_name
+    _save_meta(new_name, old_meta)
+    _meta_cache.erase(old_name)
+    _metadata_store.delete_meta(old_name)
+    Data.delete_schematic(old_name)
+    _selected_name = new_name
+    _refresh_library()
+    _select_schematic(new_name)
+
+
+func _write_schematic_file(schematic_name: String, data: Dictionary) -> void:
+    var file := ConfigFile.new()
+    file.set_value("schematic", "windows", data["windows"])
+    file.set_value("schematic", "connectors", data["connectors"])
+    file.set_value("schematic", "rect", data.get("rect", {}))
+    file.set_value("schematic", "icon", data.get("icon", "blueprint"))
+    var path := "user://schematics/%s.dat" % schematic_name
+    file.save(path)
+
+
+func _sanitize_schematic_name(value: String) -> String:
+    var cleaned := value.strip_edges()
+    var forbidden := ["/", "\\", ":", "*", "?", "\"", "<", ">", "|"]
+    for ch in forbidden:
+        cleaned = cleaned.replace(ch, "_")
+    return cleaned
+
+
 func _on_duplicate_pressed() -> void:
     if _selected_name == "":
         return
@@ -1353,18 +1522,52 @@ func _compute_stats(data: Dictionary) -> Dictionary:
     var link_count := 0
     var type_counts: Dictionary = {}
     if data.has("windows"):
-        for window_id in data.windows.keys():
-            node_count += 1
-            var wd: Dictionary = data.windows[window_id]
-            var wt := str(wd.get("window", ""))
-            if wt != "":
-                type_counts[wt] = int(type_counts.get(wt, 0)) + 1
-            if wd.has("container_data"):
-                for rid in wd.container_data.keys():
-                    resource_count += 1
-                    var outputs: Variant = wd.container_data[rid].get("outputs_id", [])
-                    if outputs is Array:
-                        link_count += outputs.size()
+        var windows_data: Variant = data.windows
+        if windows_data is Dictionary:
+            for window_id in windows_data.keys():
+                node_count += 1
+                var wd: Dictionary = windows_data[window_id]
+                var wt := str(wd.get("window", ""))
+                if wt != "":
+                    type_counts[wt] = int(type_counts.get(wt, 0)) + 1
+                if wd.has("container_data"):
+                    var container_data: Variant = wd.container_data
+                    if container_data is Dictionary:
+                        for rid in container_data.keys():
+                            resource_count += 1
+                            var outputs: Variant = container_data[rid].get("outputs_id", [])
+                            if outputs is Array:
+                                link_count += outputs.size()
+                    elif container_data is Array:
+                        for entry in container_data:
+                            resource_count += 1
+                            if entry is Dictionary:
+                                var outputs: Variant = entry.get("outputs_id", [])
+                                if outputs is Array:
+                                    link_count += outputs.size()
+        elif windows_data is Array:
+            for entry in windows_data:
+                if not (entry is Dictionary):
+                    continue
+                node_count += 1
+                var wt := str(entry.get("window", ""))
+                if wt != "":
+                    type_counts[wt] = int(type_counts.get(wt, 0)) + 1
+                if entry.has("container_data"):
+                    var container_data: Variant = entry.container_data
+                    if container_data is Dictionary:
+                        for rid in container_data.keys():
+                            resource_count += 1
+                            var outputs: Variant = container_data[rid].get("outputs_id", [])
+                            if outputs is Array:
+                                link_count += outputs.size()
+                    elif container_data is Array:
+                        for item in container_data:
+                            resource_count += 1
+                            if item is Dictionary:
+                                var outputs: Variant = item.get("outputs_id", [])
+                                if outputs is Array:
+                                    link_count += outputs.size()
     return {
         "node_count": node_count,
         "resource_count": resource_count,

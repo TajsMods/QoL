@@ -1,8 +1,3 @@
-# ==============================================================================
-# Taj's QoL - Undo/Redo Feature
-# Author: TajemnikTV
-# Description: Adds undo/redo toolbar buttons and toast notifications
-# ==============================================================================
 extends Node
 class_name TajsUndoRedoFeature
 

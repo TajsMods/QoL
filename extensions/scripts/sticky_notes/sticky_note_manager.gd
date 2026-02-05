@@ -1,8 +1,3 @@
-# ==============================================================================
-# Taj's QoL - Sticky Note Manager
-# Manages all sticky notes on the canvas
-# Ported from TajsModded
-# ==============================================================================
 extends Node
 class_name TajsStickyNoteManager
 
@@ -331,7 +326,7 @@ func get_all_notes() -> Array:
 func navigate_to_note(note: Control) -> void:
     if not is_instance_valid(note): return
     Signals.center_camera.emit(note.position + note.size / 2)
-    Globals.set_selection([], [], 0)
+    Globals.set_selection([], [])
     note._set_selected(true)
 
 func clear_all_notes() -> void:

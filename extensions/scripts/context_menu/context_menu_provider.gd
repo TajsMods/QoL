@@ -1,8 +1,3 @@
-# ==============================================================================
-# Taj's QoL - Context Menu Provider
-# Author: TajemnikTV
-# Description: Default context actions for canvas, nodes, groups, and sticky notes.
-# ==============================================================================
 extends RefCounted
 
 const LOG_NAME := "TajemnikTV-QoL:ContextMenuProvider"
@@ -52,14 +47,14 @@ func _get_canvas_actions(_context: Dictionary) -> Array:
             "title": "Add Node (WIP)",
             "icon_path": "res://textures/icons/add.png",
             "order": 0,
-            "run": Callable(self, "_run_add_node")
+            "run": Callable(self , "_run_add_node")
         },
         {
             "id": "tajs_qol.context.add_sticky_note",
             "title": "Add Sticky Note",
             "icon_path": "res://textures/icons/document.png",
             "order": 1,
-            "run": Callable(self, "_run_add_note")
+            "run": Callable(self , "_run_add_note")
         }
     ]
 
@@ -82,23 +77,23 @@ func _get_node_actions(context: Dictionary) -> Array:
                 "prompt_id": "prompt_delete_node",
                 "prompt_desc": "prompt_delete_node_desc"
             } if confirm_delete else {},
-            "run": Callable(self, "_run_delete_nodes")
+            "run": Callable(self , "_run_delete_nodes")
         },
         {
             "id": "tajs_qol.context.clear_wires",
             "title": clear_title,
             "icon_path": "res://textures/icons/connections.png",
             "priority": 10,
-            "run": Callable(self, "_run_clear_wires")
+            "run": Callable(self , "_run_clear_wires")
         },
         {
             "id": "tajs_qol.context.upgrade_nodes",
             "title": upgrade_title,
             "icon_path": "res://textures/icons/up_arrow.png",
             "priority": 5,
-            "is_visible": Callable(self, "_is_upgrade_visible"),
-            "is_enabled": Callable(self, "_is_upgrade_enabled"),
-            "run": Callable(self, "_run_upgrade_nodes")
+            "is_visible": Callable(self , "_is_upgrade_visible"),
+            "is_enabled": Callable(self , "_is_upgrade_enabled"),
+            "run": Callable(self , "_run_upgrade_nodes")
         }
     ]
 
@@ -114,7 +109,7 @@ func _get_group_actions(_context: Dictionary) -> Array:
                 "prompt_title": "Delete Group",
                 "prompt_message": "Delete group and enclosed nodes? This action cannot be undone."
             },
-            "run": Callable(self, "_run_group_remove_all")
+            "run": Callable(self , "_run_group_remove_all")
         },
         {
             "id": "tajs_qol.context.group_remove_group",
@@ -125,7 +120,7 @@ func _get_group_actions(_context: Dictionary) -> Array:
                 "prompt_title": "Delete Group",
                 "prompt_message": "Delete this group? This action cannot be undone."
             },
-            "run": Callable(self, "_run_group_remove_group")
+            "run": Callable(self , "_run_group_remove_group")
         },
         {
             "id": "tajs_qol.context.group_remove_nodes",
@@ -136,7 +131,7 @@ func _get_group_actions(_context: Dictionary) -> Array:
                 "prompt_title": "Delete Nodes",
                 "prompt_message": "Delete nodes inside this group? This action cannot be undone."
             },
-            "run": Callable(self, "_run_group_remove_nodes")
+            "run": Callable(self , "_run_group_remove_nodes")
         },
         {
             "id": "tajs_qol.context.group_customize_pattern",
@@ -144,9 +139,9 @@ func _get_group_actions(_context: Dictionary) -> Array:
             "icon_path": "res://textures/icons/grid.png",
             "category_path": ["Customize"],
             "priority": 5,
-            "is_visible": Callable(self, "_is_group_pattern_visible"),
-            "is_enabled": Callable(self, "_is_group_pattern_enabled"),
-            "run": Callable(self, "_run_group_pattern")
+            "is_visible": Callable(self , "_is_group_pattern_visible"),
+            "is_enabled": Callable(self , "_is_group_pattern_enabled"),
+            "run": Callable(self , "_run_group_pattern")
         },
         {
             "id": "tajs_qol.context.group_customize_title",
@@ -154,7 +149,7 @@ func _get_group_actions(_context: Dictionary) -> Array:
             "icon_path": "res://textures/icons/pen.png",
             "category_path": ["Customize"],
             "priority": 4,
-            "run": Callable(self, "_run_group_title")
+            "run": Callable(self , "_run_group_title")
         }
     ]
 
@@ -166,7 +161,7 @@ func _get_note_actions(_context: Dictionary) -> Array:
             "title": "Duplicate Sticky Note",
             "icon_path": "res://textures/icons/plus.png",
             "priority": 10,
-            "run": Callable(self, "_run_note_duplicate")
+            "run": Callable(self , "_run_note_duplicate")
         },
         {
             "id": "tajs_qol.context.note_customize_pattern",
@@ -174,7 +169,7 @@ func _get_note_actions(_context: Dictionary) -> Array:
             "icon_path": "res://textures/icons/grid.png",
             "category_path": ["Customize"],
             "priority": 5,
-            "run": Callable(self, "_run_note_pattern")
+            "run": Callable(self , "_run_note_pattern")
         },
         {
             "id": "tajs_qol.context.note_customize_title",
@@ -182,7 +177,7 @@ func _get_note_actions(_context: Dictionary) -> Array:
             "icon_path": "res://textures/icons/pen.png",
             "category_path": ["Customize"],
             "priority": 4,
-            "run": Callable(self, "_run_note_title")
+            "run": Callable(self , "_run_note_title")
         },
         {
             "id": "tajs_qol.context.note_delete",
@@ -193,7 +188,7 @@ func _get_note_actions(_context: Dictionary) -> Array:
                 "prompt_title": "Delete Note",
                 "prompt_message": "Delete this sticky note? This action cannot be undone."
             },
-            "run": Callable(self, "_run_note_delete")
+            "run": Callable(self , "_run_note_delete")
         },
         {
             "id": "tajs_qol.context.note_clear",
@@ -204,7 +199,7 @@ func _get_note_actions(_context: Dictionary) -> Array:
                 "prompt_title": "Clear Note",
                 "prompt_message": "Clear the note content? This action cannot be undone."
             },
-            "run": Callable(self, "_run_note_clear")
+            "run": Callable(self , "_run_note_clear")
         }
     ]
 
@@ -454,7 +449,7 @@ func _delete_windows(windows: Array) -> void:
         undo_manager.commit_action()
 
     if Globals != null:
-        Globals.set_selection([], [], 0)
+        Globals.set_selection([], [])
     _play_sound("close")
 
 

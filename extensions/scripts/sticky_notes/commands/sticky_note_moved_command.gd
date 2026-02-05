@@ -1,7 +1,4 @@
-# ==============================================================================
-# Taj's QoL - StickyNoteMovedCommand
-# Undoable command for sticky note movement
-# ==============================================================================
+class_name TajsQoLStickyNoteMovedCommand
 extends "res://mods-unpacked/TajemnikTV-Core/core/commands/undo/undo_command.gd"
 
 var _manager = null

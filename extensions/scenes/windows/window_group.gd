@@ -21,6 +21,7 @@ var pattern_thickness: float = 4.0
 var pattern_drawers: Array[Control] = []
 
 var custom_color: Color = Color.TRANSPARENT
+var qol_group_style_id: String = ""
 var _patterns_enabled: bool = true
 var _color_picker_enabled: bool = true
 
@@ -34,6 +35,8 @@ var _undo_before_state: Dictionary = {}
 
 func _ready() -> void:
     super._ready()
+    _ensure_group_style_id()
+    qol_migrate_style_keys()
     _patterns_enabled = _is_patterns_enabled()
     _color_picker_enabled = _is_color_picker_enabled()
     _load_lock_from_settings()
@@ -179,7 +182,7 @@ func _setup_color_picker() -> void:
         return
     if _color_picker_layer != null:
         if not _color_picker_layer.is_inside_tree() and get_tree() != null:
-            get_tree().root.add_child(_color_picker_layer)
+            get_tree().root.call_deferred("add_child", _color_picker_layer)
         if _color_picker == null:
             _create_color_picker_panel()
         return
@@ -188,7 +191,7 @@ func _setup_color_picker() -> void:
     _color_picker_layer.layer = 100
     _color_picker_layer.visible = false
     if get_tree() != null:
-        get_tree().root.add_child(_color_picker_layer)
+        get_tree().root.call_deferred("add_child", _color_picker_layer)
     else:
         call_deferred("_ensure_color_picker_in_tree")
 
@@ -226,13 +229,13 @@ func _create_color_picker_panel() -> void:
 
 func _ensure_color_picker_in_tree() -> void:
     if _color_picker_layer != null and not _color_picker_layer.is_inside_tree() and get_tree() != null:
-        get_tree().root.add_child(_color_picker_layer)
+        get_tree().root.call_deferred("add_child", _color_picker_layer)
 
 
 func _setup_pattern_picker() -> void:
     if _pattern_picker_layer != null:
         if not _pattern_picker_layer.is_inside_tree() and get_tree() != null:
-            get_tree().root.add_child(_pattern_picker_layer)
+            get_tree().root.call_deferred("add_child", _pattern_picker_layer)
         _add_pattern_button()
         return
     _pattern_picker_layer = CanvasLayer.new()
@@ -409,7 +412,6 @@ func grab(g: bool) -> void:
 func _on_move_selection(to: Vector2) -> void:
     if locked:
         return
-    super._on_move_selection(to)
 
 
 func set_resizing(l: bool, t: bool, r: bool, b: bool) -> void:
@@ -476,14 +478,90 @@ func _get_group_data() -> Dictionary:
     if settings == null:
         return {}
     var all_data: Dictionary = settings.get_dict(SETTINGS_DATA_KEY, {})
-    var entry = all_data.get(_get_group_key(), {})
+    var key := _get_group_key()
+    var entry = all_data.get(key, {})
     if entry is Dictionary:
         return entry
+
+    var legacy_key := str(name)
+    if legacy_key != "" and legacy_key != key:
+        var legacy_entry = all_data.get(legacy_key, {})
+        if legacy_entry is Dictionary:
+            all_data[key] = legacy_entry
+            all_data.erase(legacy_key)
+            settings.set_value(SETTINGS_DATA_KEY, all_data)
+            return legacy_entry
+
     return {}
 
 
 func _get_group_key() -> String:
-    return str(name)
+    return _ensure_group_style_id()
+
+
+func _ensure_group_style_id() -> String:
+    if qol_group_style_id != "":
+        return qol_group_style_id
+    qol_group_style_id = Utils.generate_simple_id()
+    return qol_group_style_id
+
+
+func qol_migrate_style_keys() -> void:
+    _ensure_group_style_id()
+    _migrate_pattern_settings_entry()
+    _migrate_lock_settings_entry()
+
+
+func _migrate_pattern_settings_entry() -> void:
+    var settings = _get_core_settings()
+    if settings == null:
+        return
+    var all_data: Dictionary = settings.get_dict(SETTINGS_DATA_KEY, {})
+    var key := _get_group_key()
+    var legacy_key := str(name)
+    if legacy_key == "" or legacy_key == key:
+        return
+
+    var id_entry = all_data.get(key, null)
+    var legacy_entry = all_data.get(legacy_key, null)
+    if not (legacy_entry is Dictionary):
+        return
+
+    if id_entry is Dictionary:
+        if id_entry == legacy_entry:
+            all_data.erase(legacy_key)
+            settings.set_value(SETTINGS_DATA_KEY, all_data)
+        return
+
+    all_data[key] = legacy_entry
+    all_data.erase(legacy_key)
+    settings.set_value(SETTINGS_DATA_KEY, all_data)
+
+
+func _migrate_lock_settings_entry() -> void:
+    var settings = _get_core_settings()
+    if settings == null:
+        return
+    var all_data: Dictionary = settings.get_dict(SETTINGS_LOCK_DATA_KEY, {})
+    var key := _get_group_key()
+    var legacy_key := str(name)
+    if legacy_key == "" or legacy_key == key:
+        return
+
+    var id_entry = all_data.get(key, null)
+    var legacy_entry = all_data.get(legacy_key, null)
+    if not (legacy_entry is bool):
+        return
+
+    if id_entry is bool:
+        if id_entry == legacy_entry:
+            all_data.erase(legacy_key)
+            settings.set_value(SETTINGS_LOCK_DATA_KEY, all_data)
+        return
+
+    all_data[key] = legacy_entry
+    all_data.erase(legacy_key)
+    settings.set_value(SETTINGS_LOCK_DATA_KEY, all_data)
 
 
 func _load_lock_from_settings() -> void:
@@ -491,11 +569,23 @@ func _load_lock_from_settings() -> void:
     if settings == null:
         return
     var all_data: Dictionary = settings.get_dict(SETTINGS_LOCK_DATA_KEY, {})
-    var entry = all_data.get(_get_group_key(), null)
+    var key := _get_group_key()
+    var entry = all_data.get(key, null)
     if entry is bool:
         locked = entry
-    else:
-        locked = false
+        return
+
+    var legacy_key := str(name)
+    if legacy_key != "" and legacy_key != key:
+        var legacy_entry = all_data.get(legacy_key, null)
+        if legacy_entry is bool:
+            locked = legacy_entry
+            all_data[key] = legacy_entry
+            all_data.erase(legacy_key)
+            settings.set_value(SETTINGS_LOCK_DATA_KEY, all_data)
+            return
+
+    locked = false
 
 
 func _save_lock_to_settings() -> void:
@@ -541,6 +631,18 @@ func _push_pattern_undo_command() -> void:
     cmd.setup(self , _undo_before_state, after_state)
     undo_manager.push_command(cmd)
     _undo_before_state = after_state
+
+
+func export() -> Dictionary:
+    return super.export().merged({
+        "qol_group_style_id": _ensure_group_style_id()
+    })
+
+
+func save() -> Dictionary:
+    return super.save().merged({
+        "qol_group_style_id": _ensure_group_style_id()
+    })
 
 
 func _get_core_settings():

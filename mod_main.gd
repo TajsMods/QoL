@@ -82,7 +82,6 @@ const SETTING_GROUP_LOCK_DATA := "%s.group_lock_data" % SETTINGS_PREFIX
 const SETTING_COLOR_PICKER_DATA := "%s.color_picker" % SETTINGS_PREFIX
 const SETTING_HIDE_PURCHASED_TOKENS := "%s.hide_purchased_tokens" % SETTINGS_PREFIX
 const SETTING_HIDE_MAXED_UPGRADES := "%s.hide_maxed_upgrades" % SETTINGS_PREFIX
-const SETTING_HIDE_CLAIMED_REQUESTS := "%s.hide_claimed_requests" % SETTINGS_PREFIX
 const SETTING_CONTEXT_RADIAL_ENABLED := "%s.context_radial_enabled" % SETTINGS_PREFIX
 const SETTING_SCHEMATIC_LEGACY_VIEW := "%s.schematic_legacy_view" % SETTINGS_PREFIX
 
@@ -181,8 +180,6 @@ func _init() -> void:
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/camera_2d.gd")
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/tokens_tab.gd")
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/upgrades_tab.gd")
-        ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/request_panel.gd")
-        ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/requests_tab.gd")
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/window_breach.gd")
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/popup_schematic.gd")
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/edit_group_popup.gd")
@@ -674,13 +671,7 @@ func _register_settings() -> void:
             "description": "Hide maxed upgrades in the shop.",
             "category": "Shop & Requests"
         },
-        SETTING_HIDE_CLAIMED_REQUESTS: {
-            "type": "bool",
-            "default": true,
-            "label": "Hide Claimed Requests",
-            "description": "Hide claimed requests.",
-            "category": "Shop & Requests"
-        }
+
     }
     _settings.register_schema(MOD_ID, schema, SETTINGS_PREFIX)
     if existing_wire_drop is String and existing_wire_drop == missing_sentinel and legacy_wire_drop != null:
@@ -860,6 +851,7 @@ func _on_desktop_ready(_payload: Dictionary) -> void:
     if _group_patterns != null and _settings != null:
         _group_patterns.set_enabled(_settings.get_bool(SETTING_GROUP_PATTERNS_ENABLED, true))
         _group_patterns.set_color_picker_enabled(_settings.get_bool(SETTING_GROUP_COLOR_PICKER_ENABLED, true))
+        _group_patterns.cleanup_legacy_group_style_keys()
 
 
 func _on_node_added(_node: Node) -> void:

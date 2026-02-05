@@ -1,7 +1,3 @@
-# ==============================================================================
-# Taj's QoL - Icon Picker Popup
-# Description: Shared modal icon picker using the core icon browser.
-# ==============================================================================
 class_name TajsQolIconPickerPopup
 extends Node
 

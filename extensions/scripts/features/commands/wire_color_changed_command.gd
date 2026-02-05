@@ -1,12 +1,8 @@
-# ==============================================================================
-# Taj's QoL - WireColorChangedCommand
-# Undoable command for wire color changes
-# ==============================================================================
 extends "res://mods-unpacked/TajemnikTV-Core/core/commands/undo/undo_command.gd"
 
 var _feature_ref: WeakRef = null
 var _resource_id: String = ""
-var _before_hex: String = ""  # Empty string means "use original"
+var _before_hex: String = "" # Empty string means "use original"
 var _after_hex: String = ""
 
 ## Setup the command
