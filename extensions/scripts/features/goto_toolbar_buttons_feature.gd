@@ -6,6 +6,22 @@ const GROUP_COMMAND_ID := "tajs_qol.goto_group"
 const NOTE_COMMAND_ID := "tajs_qol.goto_note"
 const GROUP_ICON_PATH := "res://textures/icons/crosshair.png"
 const NOTE_ICON_PATH := "res://textures/icons/document.png"
+const TOOLS_PATH := "Main/HUD/Main/MainContainer/Overlay/ToolsBar/Tools"
+const SEPARATOR_NODE_NAME := "QolToolsSeparator"
+
+const VANILLA_TOOL_NAMES := [
+    "Cursor",
+    "Move",
+    "Select",
+    "ConnectionEdit"
+]
+
+const MOD_TOOL_NAMES := [
+    "UndoButton",
+    "RedoButton",
+    "GotoGroupButton",
+    "GotoNoteButton"
+]
 
 var _core = null
 var _initialized: bool = false
@@ -56,24 +72,12 @@ func _add_toolbar_buttons() -> void:
         ModLoaderLog.warning("ToolsBar/Tools container not found", LOG_NAME)
         return
 
+    var separator = _ensure_separator(tools_container)
+
     _group_button = tools_container.get_node_or_null("GotoGroupButton")
     _note_button = tools_container.get_node_or_null("GotoNoteButton")
-    if _group_button != null and _note_button != null:
-        return
 
-    var insert_index := tools_container.get_child_count()
-    var redo_button = tools_container.get_node_or_null("RedoButton")
-    var undo_button = tools_container.get_node_or_null("UndoButton")
-    if redo_button != null:
-        insert_index = redo_button.get_index() + 1
-    elif undo_button != null:
-        insert_index = undo_button.get_index() + 1
-
-    var group: ButtonGroup = null
-    if tools_container.get_child_count() > 0:
-        var first_child = tools_container.get_child(0)
-        if first_child is Button:
-            group = first_child.button_group
+    var group = _get_tools_button_group(tools_container)
 
     if _group_button == null:
         _group_button = _create_button(
@@ -84,6 +88,8 @@ func _add_toolbar_buttons() -> void:
             group
         )
         tools_container.add_child(_group_button)
+    else:
+        _apply_toolbar_button_style(_group_button, group)
 
     if _note_button == null:
         _note_button = _create_button(
@@ -94,9 +100,20 @@ func _add_toolbar_buttons() -> void:
             group
         )
         tools_container.add_child(_note_button)
+    else:
+        _apply_toolbar_button_style(_note_button, group)
+
+    var insert_index := separator.get_index() + 1 if separator != null else tools_container.get_child_count()
+    var redo_button = tools_container.get_node_or_null("RedoButton")
+    var undo_button = tools_container.get_node_or_null("UndoButton")
+    if undo_button != null:
+        insert_index = maxi(insert_index, undo_button.get_index() + 1)
+    if redo_button != null:
+        insert_index = maxi(insert_index, redo_button.get_index() + 1)
 
     tools_container.move_child(_group_button, insert_index)
     tools_container.move_child(_note_button, insert_index + 1)
+    _update_separator_visibility(tools_container)
     ModLoaderLog.success("Go To buttons added to tools bar", LOG_NAME)
 
 
@@ -104,29 +121,101 @@ func _create_button(btn_name: String, icon_path: String, tooltip: String, presse
     var button = Button.new()
     button.name = btn_name
 
-    var img: Image = load(icon_path).get_image()
-    img.resize(35, 35, Image.INTERPOLATE_TRILINEAR)
-    button.icon = ImageTexture.create_from_image(img)
-
-    button.flat = true
-    button.custom_minimum_size = Vector2(60, 40)
+    button.icon = load(icon_path)
     button.tooltip_text = tooltip
-    button.focus_mode = Control.FOCUS_NONE
     button.pressed.connect(pressed_action)
 
-    button.toggle_mode = true
-    if group != null:
-        button.button_group = group
-    button.toggled.connect(func(t): if t: button.set_pressed_no_signal(false))
+    _apply_toolbar_button_style(button, group)
 
     return button
+
+
+func _apply_toolbar_button_style(button: Button, group: ButtonGroup) -> void:
+    button.custom_minimum_size = Vector2(80, 80)
+    button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER | Control.SIZE_EXPAND
+    button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+    button.focus_mode = Control.FOCUS_NONE
+    button.theme_type_variation = "ButtonMenu"
+    button.toggle_mode = true
+    button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    button.expand_icon = true
+    if group != null:
+        button.button_group = group
+    var toggle_cb = Callable(self, "_on_toolbar_button_toggled").bind(button)
+    if not button.toggled.is_connected(toggle_cb):
+        button.toggled.connect(toggle_cb)
+
+
+func _get_tools_button_group(tools_container: Control) -> ButtonGroup:
+    if tools_container == null:
+        return null
+    for child in tools_container.get_children():
+        if child is Button:
+            return child.button_group
+    return null
+
+
+func _ensure_separator(tools_container: Control) -> VSeparator:
+    var separator = tools_container.get_node_or_null(SEPARATOR_NODE_NAME) as VSeparator
+    if separator == null:
+        separator = VSeparator.new()
+        separator.name = SEPARATOR_NODE_NAME
+        separator.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        separator.custom_minimum_size = Vector2(2, 58)
+        separator.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+        separator.modulate = Color(0.75, 0.84, 1.0, 0.28)
+        tools_container.add_child(separator)
+    tools_container.move_child(separator, _get_separator_boundary_index(tools_container))
+    return separator
+
+
+func _get_separator_boundary_index(tools_container: Control) -> int:
+    var last_vanilla_index := -1
+    for node_name in VANILLA_TOOL_NAMES:
+        var node = tools_container.get_node_or_null(node_name)
+        if node != null:
+            last_vanilla_index = maxi(last_vanilla_index, node.get_index())
+    if last_vanilla_index >= 0:
+        return last_vanilla_index + 1
+
+    var first_mod_index := tools_container.get_child_count()
+    var has_mod := false
+    for node_name in MOD_TOOL_NAMES:
+        var node = tools_container.get_node_or_null(node_name)
+        if node != null:
+            first_mod_index = mini(first_mod_index, node.get_index())
+            has_mod = true
+    if has_mod:
+        return first_mod_index
+
+    return tools_container.get_child_count()
+
+
+func _update_separator_visibility(tools_container: Control) -> void:
+    if tools_container == null:
+        return
+    var separator = tools_container.get_node_or_null(SEPARATOR_NODE_NAME)
+    if separator == null:
+        return
+    var has_visible_mod := false
+    for node_name in MOD_TOOL_NAMES:
+        var node = tools_container.get_node_or_null(node_name)
+        if node != null and node.visible:
+            has_visible_mod = true
+            break
+    separator.visible = has_visible_mod
+
+
+func _on_toolbar_button_toggled(toggled: bool, button: Button) -> void:
+    if toggled and button != null:
+        button.set_pressed_no_signal(false)
 
 
 func _get_tools_container() -> Control:
     var tree = get_tree()
     if tree == null:
         return null
-    return tree.root.get_node_or_null("Main/HUD/Main/MainContainer/Overlay/ToolsBar/Tools")
+    return tree.root.get_node_or_null(TOOLS_PATH)
 
 
 func _on_goto_group_pressed() -> void:
@@ -156,6 +245,7 @@ func _update_button_visibility() -> void:
         _group_button.visible = _group_enabled
     if _note_button != null:
         _note_button.visible = _note_enabled
+    _update_separator_visibility(_get_tools_container())
 
 
 func _notify(icon: String, message: String) -> void:

@@ -3,6 +3,22 @@ class_name TajsUndoRedoFeature
 
 const LOG_NAME = "TajsQoL:UndoRedoFeature"
 const UNDO_ICON_PATH := "res://textures/icons/return.png"
+const TOOLS_PATH := "Main/HUD/Main/MainContainer/Overlay/ToolsBar/Tools"
+const SEPARATOR_NODE_NAME := "QolToolsSeparator"
+
+const VANILLA_TOOL_NAMES := [
+    "Cursor",
+    "Move",
+    "Select",
+    "ConnectionEdit"
+]
+
+const MOD_TOOL_NAMES := [
+    "UndoButton",
+    "RedoButton",
+    "GotoGroupButton",
+    "GotoNoteButton"
+]
 
 var _core = null
 var _undo_manager = null
@@ -12,7 +28,7 @@ var _initialized: bool = false
 
 var _undo_button: Button = null
 var _redo_button: Button = null
-var _spacer: Control = null
+var _separator: VSeparator = null
 
 func setup(core) -> void:
     _core = core
@@ -75,70 +91,33 @@ func _add_toolbar_buttons() -> void:
         ModLoaderLog.warning("ToolsBar/Tools container not found", LOG_NAME)
         return
 
-    # Check if buttons already exist
-    if tools_container.has_node("UndoButton"):
-        _undo_button = tools_container.get_node("UndoButton")
-        _redo_button = tools_container.get_node_or_null("RedoButton")
-        return
+    var group = _get_tools_button_group(tools_container)
 
-    # Get the button group from existing tools
-    var group: ButtonGroup = null
-    if tools_container.get_child_count() > 0:
-        var first_child = tools_container.get_child(0)
-        if first_child is Button:
-            group = first_child.button_group
+    _separator = _ensure_separator(tools_container)
 
-    # Create spacer
-    _spacer = Control.new()
-    _spacer.name = "UndoSpacer"
-    _spacer.custom_minimum_size = Vector2(5, 0)
-    _spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-    tools_container.add_child(_spacer)
+    _undo_button = tools_container.get_node_or_null("UndoButton")
+    if _undo_button == null:
+        _undo_button = Button.new()
+        _undo_button.name = "UndoButton"
+        _undo_button.pressed.connect(_on_undo_button_pressed)
+        tools_container.add_child(_undo_button)
+    _apply_toolbar_button_style(_undo_button, group)
+    _undo_button.icon = load(UNDO_ICON_PATH)
 
-    # Create Undo button
-    _undo_button = Button.new()
-    _undo_button.name = "UndoButton"
+    _redo_button = tools_container.get_node_or_null("RedoButton")
+    if _redo_button == null:
+        _redo_button = Button.new()
+        _redo_button.name = "RedoButton"
+        _redo_button.pressed.connect(_on_redo_button_pressed)
+        tools_container.add_child(_redo_button)
+    _apply_toolbar_button_style(_redo_button, group)
+    _redo_button.icon = _build_redo_icon()
 
-    var img: Image = load(UNDO_ICON_PATH).get_image()
-    img.resize(35, 35, Image.INTERPOLATE_TRILINEAR)
-    _undo_button.icon = ImageTexture.create_from_image(img)
+    var insert_index := _separator.get_index() + 1 if _separator != null else tools_container.get_child_count()
+    tools_container.move_child(_undo_button, insert_index)
+    tools_container.move_child(_redo_button, insert_index + 1)
 
-    _undo_button.flat = true
-    _undo_button.custom_minimum_size = Vector2(60, 40)
-    _undo_button.tooltip_text = "Undo (Ctrl+Z)"
-    _undo_button.focus_mode = Control.FOCUS_NONE
-    _undo_button.pressed.connect(_on_undo_button_pressed)
-
-    # Match style with tools bar
-    _undo_button.toggle_mode = true
-    if group != null:
-        _undo_button.button_group = group
-    _undo_button.toggled.connect(func(t): if t: _undo_button.set_pressed_no_signal(false))
-
-    tools_container.add_child(_undo_button)
-
-    # Create Redo button
-    _redo_button = Button.new()
-    _redo_button.name = "RedoButton"
-
-    # Use same icon and flip it for Redo
-    var img_redo: Image = load(UNDO_ICON_PATH).get_image()
-    img_redo.flip_x()
-    img_redo.resize(35, 35, Image.INTERPOLATE_TRILINEAR)
-    _redo_button.icon = ImageTexture.create_from_image(img_redo)
-
-    _redo_button.flat = true
-    _redo_button.custom_minimum_size = Vector2(60, 40)
-    _redo_button.tooltip_text = "Redo (Ctrl+Y)"
-    _redo_button.focus_mode = Control.FOCUS_NONE
-    _redo_button.pressed.connect(_on_redo_button_pressed)
-
-    _redo_button.toggle_mode = true
-    if group != null:
-        _redo_button.button_group = group
-    _redo_button.toggled.connect(func(t): if t: _redo_button.set_pressed_no_signal(false))
-
-    tools_container.add_child(_redo_button)
+    _update_separator_visibility(tools_container)
 
     ModLoaderLog.success("Undo/Redo buttons added to toolbar", LOG_NAME)
 
@@ -147,7 +126,97 @@ func _get_tools_container() -> Control:
     var tree = get_tree()
     if tree == null:
         return null
-    return tree.root.get_node_or_null("Main/HUD/Main/MainContainer/Overlay/ToolsBar/Tools")
+    return tree.root.get_node_or_null(TOOLS_PATH)
+
+
+func _get_tools_button_group(tools_container: Control) -> ButtonGroup:
+    if tools_container == null:
+        return null
+    for child in tools_container.get_children():
+        if child is Button:
+            return child.button_group
+    return null
+
+
+func _apply_toolbar_button_style(button: Button, group: ButtonGroup) -> void:
+    button.custom_minimum_size = Vector2(80, 80)
+    button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER | Control.SIZE_EXPAND
+    button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+    button.focus_mode = Control.FOCUS_NONE
+    button.theme_type_variation = "ButtonMenu"
+    button.toggle_mode = true
+    button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    button.expand_icon = true
+    if group != null:
+        button.button_group = group
+    var toggle_cb = Callable(self, "_on_toolbar_button_toggled").bind(button)
+    if not button.toggled.is_connected(toggle_cb):
+        button.toggled.connect(toggle_cb)
+
+
+func _build_redo_icon() -> Texture2D:
+    var base_texture = load(UNDO_ICON_PATH) as Texture2D
+    if base_texture == null:
+        return null
+    var img = base_texture.get_image()
+    img.flip_x()
+    return ImageTexture.create_from_image(img)
+
+
+func _ensure_separator(tools_container: Control) -> VSeparator:
+    var separator = tools_container.get_node_or_null(SEPARATOR_NODE_NAME) as VSeparator
+    if separator == null:
+        separator = VSeparator.new()
+        separator.name = SEPARATOR_NODE_NAME
+        separator.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        separator.custom_minimum_size = Vector2(2, 58)
+        separator.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+        separator.modulate = Color(0.75, 0.84, 1.0, 0.28)
+        tools_container.add_child(separator)
+    tools_container.move_child(separator, _get_separator_boundary_index(tools_container))
+    return separator
+
+
+func _get_separator_boundary_index(tools_container: Control) -> int:
+    var last_vanilla_index := -1
+    for node_name in VANILLA_TOOL_NAMES:
+        var node = tools_container.get_node_or_null(node_name)
+        if node != null:
+            last_vanilla_index = maxi(last_vanilla_index, node.get_index())
+    if last_vanilla_index >= 0:
+        return last_vanilla_index + 1
+
+    var first_mod_index := tools_container.get_child_count()
+    var has_mod := false
+    for node_name in MOD_TOOL_NAMES:
+        var node = tools_container.get_node_or_null(node_name)
+        if node != null:
+            first_mod_index = mini(first_mod_index, node.get_index())
+            has_mod = true
+    if has_mod:
+        return first_mod_index
+
+    return tools_container.get_child_count()
+
+
+func _update_separator_visibility(tools_container: Control) -> void:
+    if tools_container == null:
+        return
+    var separator = tools_container.get_node_or_null(SEPARATOR_NODE_NAME)
+    if separator == null:
+        return
+    var has_visible_mod := false
+    for node_name in MOD_TOOL_NAMES:
+        var node = tools_container.get_node_or_null(node_name)
+        if node != null and node.visible:
+            has_visible_mod = true
+            break
+    separator.visible = has_visible_mod
+
+
+func _on_toolbar_button_toggled(toggled: bool, button: Button) -> void:
+    if toggled and button != null:
+        button.set_pressed_no_signal(false)
 
 
 func _on_undo_button_pressed() -> void:
@@ -193,7 +262,6 @@ func _update_button_states() -> void:
 
     if _undo_button != null:
         _undo_button.disabled = not can_undo
-        _undo_button.modulate = Color(1, 1, 1, 1) if can_undo else Color(1, 1, 1, 0.5)
         if can_undo:
             var desc: String = _undo_manager.get_undo_description()
             _undo_button.tooltip_text = "Undo: %s (Ctrl+Z)" % desc if desc != "" else "Undo (Ctrl+Z)"
@@ -202,7 +270,6 @@ func _update_button_states() -> void:
 
     if _redo_button != null:
         _redo_button.disabled = not can_redo
-        _redo_button.modulate = Color(1, 1, 1, 1) if can_redo else Color(1, 1, 1, 0.5)
         if can_redo:
             var desc: String = _undo_manager.get_redo_description()
             _redo_button.tooltip_text = "Redo: %s (Ctrl+Y)" % desc if desc != "" else "Redo (Ctrl+Y)"
@@ -215,5 +282,4 @@ func _update_buttons_visibility() -> void:
         _undo_button.visible = _buttons_enabled
     if _redo_button != null:
         _redo_button.visible = _buttons_enabled
-    if _spacer != null:
-        _spacer.visible = _buttons_enabled
+    _update_separator_visibility(_get_tools_container())

@@ -1,8 +1,3 @@
-# ==============================================================================
-# Taj's QoL - Main
-# Author: TajemnikTV
-# Description: Adds QoL features to the game
-# ==============================================================================
 extends Node
 
 const MOD_ID := "TajemnikTV-QoL"
@@ -21,10 +16,10 @@ const FocusMuteFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/exten
 const ControllerBlockFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/controller_block_feature.gd")
 const NotificationHistoryFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/notification_history_feature.gd")
 const ScreenshotFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/screenshot_feature.gd")
+const ScreenshotToolbarFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/screenshot_toolbar_feature.gd")
 const WireColorsFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/wire_colors_feature.gd")
 const VisualEffectsFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/visual_effects_feature.gd")
 const DisconnectedHighlightFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/disconnected_highlight_feature.gd")
-const BreachThreatFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/breach_threat_feature.gd")
 const ContextRadialFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/context_radial_feature.gd")
 const ContextMenuProviderScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/context_menu/context_menu_provider.gd")
 const GroupPatternsFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/group_patterns_feature.gd")
@@ -42,11 +37,6 @@ const SETTING_EXTRA_INPUTS_ENABLED := "%s.extra_inputs_enabled" % SETTINGS_PREFI
 const SETTING_GOTO_GROUP_BUTTON_ENABLED := "%s.goto_group_button_enabled" % SETTINGS_PREFIX
 const SETTING_GOTO_NOTE_BUTTON_ENABLED := "%s.goto_note_button_enabled" % SETTINGS_PREFIX
 const SETTING_UNDO_REDO_BUTTONS_ENABLED := "%s.undo_redo_buttons_enabled" % SETTINGS_PREFIX
-const SETTING_BREACH_ESCALATION_ENABLED := "%s.breach_escalation_enabled" % SETTINGS_PREFIX
-const SETTING_BREACH_ESCALATION_THRESHOLD := "%s.breach_escalation_threshold" % SETTINGS_PREFIX
-const SETTING_BREACH_DEESCALATION_ENABLED := "%s.breach_deescalation_enabled" % SETTINGS_PREFIX
-const SETTING_BREACH_DEESCALATION_THRESHOLD := "%s.breach_deescalation_threshold" % SETTINGS_PREFIX
-const SETTING_BREACH_ESCALATION_COOLDOWN := "%s.breach_escalation_cooldown" % SETTINGS_PREFIX
 const SETTING_FOCUS_MUTE_ENABLED := "%s.focus_mute_enabled" % SETTINGS_PREFIX
 const SETTING_FOCUS_BG_VOLUME := "%s.focus_background_volume" % SETTINGS_PREFIX
 const SETTING_NOTIFICATION_HISTORY_ENABLED := "%s.notification_history_enabled" % SETTINGS_PREFIX
@@ -59,8 +49,6 @@ const SETTING_SCREENSHOT_ENABLED := "%s.screenshot_enabled" % SETTINGS_PREFIX
 const SETTING_SCREENSHOT_QUALITY := "%s.screenshot_quality" % SETTINGS_PREFIX
 const SETTING_SCREENSHOT_FOLDER := "%s.screenshot_folder" % SETTINGS_PREFIX
 const SETTING_SCREENSHOT_WATERMARK := "%s.screenshot_watermark" % SETTINGS_PREFIX
-const ACTION_SCREENSHOT_FULL := "%s.screenshot_action_full" % SETTINGS_PREFIX
-const ACTION_SCREENSHOT_SELECTION := "%s.screenshot_action_selection" % SETTINGS_PREFIX
 const ACTION_SCREENSHOT_OPEN_FOLDER := "%s.screenshot_action_open_folder" % SETTINGS_PREFIX
 const ACTION_SCREENSHOT_CHANGE_FOLDER := "%s.screenshot_action_change_folder" % SETTINGS_PREFIX
 const SETTING_WIRE_COLORS_ENABLED := "%s.wire_colors_enabled" % SETTINGS_PREFIX
@@ -81,7 +69,6 @@ const SETTING_GROUP_PATTERNS_DATA := "%s.group_patterns" % SETTINGS_PREFIX
 const SETTING_GROUP_LOCK_DATA := "%s.group_lock_data" % SETTINGS_PREFIX
 const SETTING_COLOR_PICKER_DATA := "%s.color_picker" % SETTINGS_PREFIX
 const SETTING_HIDE_PURCHASED_TOKENS := "%s.hide_purchased_tokens" % SETTINGS_PREFIX
-const SETTING_HIDE_MAXED_UPGRADES := "%s.hide_maxed_upgrades" % SETTINGS_PREFIX
 const SETTING_CONTEXT_RADIAL_ENABLED := "%s.context_radial_enabled" % SETTINGS_PREFIX
 const SETTING_SCHEMATIC_LEGACY_VIEW := "%s.schematic_legacy_view" % SETTINGS_PREFIX
 
@@ -94,11 +81,6 @@ const SETTINGS_KEYS := [
     SETTING_GOTO_GROUP_BUTTON_ENABLED,
     SETTING_GOTO_NOTE_BUTTON_ENABLED,
     SETTING_UNDO_REDO_BUTTONS_ENABLED,
-    SETTING_BREACH_ESCALATION_ENABLED,
-    SETTING_BREACH_ESCALATION_THRESHOLD,
-    SETTING_BREACH_DEESCALATION_ENABLED,
-    SETTING_BREACH_DEESCALATION_THRESHOLD,
-    SETTING_BREACH_ESCALATION_COOLDOWN,
     SETTING_FOCUS_MUTE_ENABLED,
     SETTING_FOCUS_BG_VOLUME,
     SETTING_NOTIFICATION_HISTORY_ENABLED,
@@ -145,10 +127,10 @@ var _focus_mute
 var _controller_block
 var _notification_history
 var _screenshot
+var _screenshot_toolbar
 var _wire_colors
 var _visual_effects
 var _disconnected_highlight
-var _breach_threat
 var _context_radial
 var _context_menu_provider
 var _group_patterns
@@ -179,8 +161,6 @@ func _init() -> void:
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/options_bar.gd")
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/camera_2d.gd")
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/tokens_tab.gd")
-        ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/upgrades_tab.gd")
-        ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/window_breach.gd")
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/popup_schematic.gd")
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/edit_group_popup.gd")
         ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/schematic_container.gd")
@@ -205,6 +185,8 @@ func _init() -> void:
 func _ready() -> void:
     if _screenshot != null:
         _screenshot.set_tree(get_tree())
+    if _screenshot_toolbar != null:
+        _screenshot_toolbar.set_tree(get_tree())
     if _wire_colors != null:
         _wire_colors.set_tree(get_tree())
     # Settings UI is auto-generated from schema in Core.
@@ -305,53 +287,6 @@ func _register_settings() -> void:
             "label": "Use Legacy Schematics Browser",
             "description": "Show the original schematics list instead of the new library UI.",
             "category": "UI"
-        },
-        SETTING_BREACH_ESCALATION_ENABLED: {
-            "type": "bool",
-            "default": true,
-            "label": "Auto Threat Adjustment",
-            "description": "Automatically adjust breach threat level after consecutive successes/failures.",
-            "category": "Breach Threat"
-        },
-        SETTING_BREACH_ESCALATION_THRESHOLD: {
-            "type": "int",
-            "default": 3,
-            "label": "Escalation Threshold (Successes)",
-            "description": "Successful breaches required before escalating threat level.",
-            "category": "Breach Threat",
-            "min": 1,
-            "max": 15,
-            "step": 1,
-            "depends_on": {"key": SETTING_BREACH_ESCALATION_ENABLED, "equals": true}
-        },
-        SETTING_BREACH_DEESCALATION_ENABLED: {
-            "type": "bool",
-            "default": true,
-            "label": "Auto De-escalation",
-            "description": "Auto-decrease breach threat level after consecutive failures.",
-            "category": "Breach Threat"
-        },
-        SETTING_BREACH_DEESCALATION_THRESHOLD: {
-            "type": "int",
-            "default": 5,
-            "label": "De-escalation Threshold (Failures)",
-            "description": "Failed breaches required before de-escalating threat level.",
-            "category": "Breach Threat",
-            "min": 1,
-            "max": 15,
-            "step": 1,
-            "depends_on": {"key": SETTING_BREACH_DEESCALATION_ENABLED, "equals": true}
-        },
-        SETTING_BREACH_ESCALATION_COOLDOWN: {
-            "type": "int",
-            "default": 10,
-            "label": "Escalation Cooldown (Successes)",
-            "description": "Successful breaches to wait after de-escalation before escalating again.",
-            "category": "Breach Threat",
-            "min": 0,
-            "max": 30,
-            "step": 1,
-            "depends_on": {"key": SETTING_BREACH_ESCALATION_ENABLED, "equals": true}
         },
         SETTING_FOCUS_MUTE_ENABLED: {
             "type": "bool",
@@ -461,24 +396,6 @@ func _register_settings() -> void:
             "label": "Screenshot Watermark",
             "description": "Include a watermark on screenshots when available.",
             "category": "Screenshots",
-            "depends_on": {"key": SETTING_SCREENSHOT_ENABLED, "equals": true}
-        },
-        ACTION_SCREENSHOT_FULL: {
-            "type": "action",
-            "default": false,
-            "label": "Take Full Screenshot",
-            "description": "Capture a full desktop screenshot.",
-            "category": "Screenshots",
-            "action": Callable(self , "_on_screenshot_full"),
-            "depends_on": {"key": SETTING_SCREENSHOT_ENABLED, "equals": true}
-        },
-        ACTION_SCREENSHOT_SELECTION: {
-            "type": "action",
-            "default": false,
-            "label": "Capture Selection",
-            "description": "Capture only selected nodes.",
-            "category": "Screenshots",
-            "action": Callable(self , "_on_screenshot_selection"),
             "depends_on": {"key": SETTING_SCREENSHOT_ENABLED, "equals": true}
         },
         ACTION_SCREENSHOT_OPEN_FOLDER: {
@@ -664,14 +581,6 @@ func _register_settings() -> void:
             "description": "Hide purchased tokens in the shop.",
             "category": "Shop & Requests"
         },
-        SETTING_HIDE_MAXED_UPGRADES: {
-            "type": "bool",
-            "default": true,
-            "label": "Hide Maxed Upgrades",
-            "description": "Hide maxed upgrades in the shop.",
-            "category": "Shop & Requests"
-        },
-
     }
     _settings.register_schema(MOD_ID, schema, SETTINGS_PREFIX)
     if existing_wire_drop is String and existing_wire_drop == missing_sentinel and legacy_wire_drop != null:
@@ -709,6 +618,10 @@ func _init_features() -> void:
     _screenshot = ScreenshotFeatureScript.new()
     _screenshot.setup(_core)
 
+    _screenshot_toolbar = ScreenshotToolbarFeatureScript.new()
+    _screenshot_toolbar.setup(_core, Callable(self, "_on_screenshot_full"), Callable(self, "_on_screenshot_selection"))
+    add_child(_screenshot_toolbar)
+
     _wire_colors = WireColorsFeatureScript.new()
     _wire_colors.setup(_core)
 
@@ -718,12 +631,6 @@ func _init_features() -> void:
     _disconnected_highlight = DisconnectedHighlightFeatureScript.new()
     _disconnected_highlight.setup(_core)
     add_child(_disconnected_highlight)
-
-    _breach_threat = BreachThreatFeatureScript.new()
-    _breach_threat.setup(_core)
-    add_child(_breach_threat)
-    if _core != null and _core.has_method("extend_globals"):
-        _core.extend_globals("breach_threat_manager", _breach_threat)
 
     _group_patterns = GroupPatternsFeatureScript.new()
 
@@ -766,11 +673,6 @@ func _init_features() -> void:
         SETTING_WIRE_CLEAR_ENABLED: func(value): _wire_clear.set_enabled(bool(value)),
         SETTING_WIRE_DROP_ENABLED: func(value): _wire_drop.set_enabled(bool(value)),
         SETTING_DISABLE_SLIDER_SCROLL: func(value): _slider_scroll_block.set_enabled(bool(value)),
-        SETTING_BREACH_ESCALATION_ENABLED: func(value): _breach_threat.set_enabled(bool(value)),
-        SETTING_BREACH_ESCALATION_THRESHOLD: func(value): _breach_threat.set_threshold(int(value)),
-        SETTING_BREACH_DEESCALATION_ENABLED: func(value): _breach_threat.set_deescalation_enabled(bool(value)),
-        SETTING_BREACH_DEESCALATION_THRESHOLD: func(value): _breach_threat.set_deescalation_threshold(int(value)),
-        SETTING_BREACH_ESCALATION_COOLDOWN: func(value): _breach_threat.set_escalation_cooldown(int(value)),
         SETTING_FOCUS_MUTE_ENABLED: func(value): _focus_mute.set_enabled(bool(value)),
         SETTING_FOCUS_BG_VOLUME: func(value): _focus_mute.set_background_volume(float(value)),
         SETTING_NOTIFICATION_HISTORY_ENABLED: func(value): _notification_history.set_enabled(bool(value)),
@@ -779,7 +681,7 @@ func _init_features() -> void:
         SETTING_GOTO_GROUP_BUTTON_ENABLED: func(value): if _goto_toolbar_buttons != null: _goto_toolbar_buttons.set_group_button_enabled(bool(value)),
         SETTING_GOTO_NOTE_BUTTON_ENABLED: func(value): if _goto_toolbar_buttons != null: _goto_toolbar_buttons.set_note_button_enabled(bool(value)),
         SETTING_UNDO_REDO_BUTTONS_ENABLED: func(value): if _undo_redo != null: _undo_redo.set_buttons_enabled(bool(value)),
-        SETTING_SCREENSHOT_ENABLED: func(value): _screenshot.set_enabled(bool(value)),
+        SETTING_SCREENSHOT_ENABLED: func(value): _set_screenshot_enabled(bool(value)),
         SETTING_SCREENSHOT_QUALITY: func(value): _screenshot.set_quality(int(value)),
         SETTING_SCREENSHOT_FOLDER: func(value): _screenshot.set_screenshot_folder(str(value)),
         SETTING_SCREENSHOT_WATERMARK: func(value): _screenshot.set_watermark_enabled(bool(value)),
@@ -1130,26 +1032,6 @@ func _build_settings_ui(container: VBoxContainer) -> void:
     _setting_ui_updaters[SETTING_CAMERA_ZOOM_STEP] = func(value): zoom_step_slider.value = float(value)
 
     ui.add_separator(container)
-    ui.add_section_header(container, "Breach Threat")
-
-    _bind_toggle(ui, container, "Auto Threat Adjustment", SETTING_BREACH_ESCALATION_ENABLED, true, "Automatically adjust breach threat level based on consecutive successes/failures.")
-    var escalation_slider = ui.add_slider(container, "Escalation Threshold (Successes)", _settings.get_int(SETTING_BREACH_ESCALATION_THRESHOLD, 3), 1, 15, 1, "", func(v):
-        _settings.set_value(SETTING_BREACH_ESCALATION_THRESHOLD, int(v))
-    )
-    _setting_ui_updaters[SETTING_BREACH_ESCALATION_THRESHOLD] = func(value): escalation_slider.value = int(value)
-
-    _bind_toggle(ui, container, "Auto De-escalation", SETTING_BREACH_DEESCALATION_ENABLED, true, "Reduce threat level after consecutive failed breaches.")
-    var deesc_slider = ui.add_slider(container, "De-escalation Threshold (Failures)", _settings.get_int(SETTING_BREACH_DEESCALATION_THRESHOLD, 5), 1, 15, 1, "", func(v):
-        _settings.set_value(SETTING_BREACH_DEESCALATION_THRESHOLD, int(v))
-    )
-    _setting_ui_updaters[SETTING_BREACH_DEESCALATION_THRESHOLD] = func(value): deesc_slider.value = int(value)
-
-    var cooldown_slider = ui.add_slider(container, "Escalation Cooldown (Successes)", _settings.get_int(SETTING_BREACH_ESCALATION_COOLDOWN, 10), 0, 30, 1, "", func(v):
-        _settings.set_value(SETTING_BREACH_ESCALATION_COOLDOWN, int(v))
-    )
-    _setting_ui_updaters[SETTING_BREACH_ESCALATION_COOLDOWN] = func(value): cooldown_slider.value = int(value)
-
-    ui.add_separator(container)
     ui.add_section_header(container, "Visuals")
 
     _bind_toggle(ui, container, "Wire Color Overrides", SETTING_WIRE_COLORS_ENABLED, true, "Enable custom wire colors per resource.")
@@ -1278,9 +1160,6 @@ func _build_settings_ui(container: VBoxContainer) -> void:
     _setting_ui_updaters[SETTING_SCREENSHOT_QUALITY] = func(value): _quality_dropdown.selected = clampi(int(value), 0, 3)
 
     _bind_toggle(ui, container, "Screenshot Watermark", SETTING_SCREENSHOT_WATERMARK, false, "Include a watermark on screenshots when available.")
-
-    ui.add_button(container, "Take Full Screenshot", func(): _on_screenshot_full())
-    ui.add_button(container, "Capture Selection", func(): _on_screenshot_selection())
 
     ui.add_section_header(container, "Screenshot Folder")
     _folder_label = Label.new()
@@ -1436,6 +1315,12 @@ func _on_screenshot_selection() -> void:
 func _on_screenshot_folder() -> void:
     if _screenshot != null:
         _screenshot.open_screenshot_folder()
+
+func _set_screenshot_enabled(enabled: bool) -> void:
+    if _screenshot != null:
+        _screenshot.set_enabled(enabled)
+    if _screenshot_toolbar != null:
+        _screenshot_toolbar.set_enabled(enabled)
 
 func _change_screenshot_folder() -> void:
     if _screenshot == null or _settings == null:

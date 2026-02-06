@@ -1,5 +1,6 @@
 {
 	"name": "QoL",
+	"display_name": "Taj's QoL",
 	"namespace": "TajemnikTV",
 	"version_number": "2.0.0",
 	"description": "Quality-of-life utilities powered by Taj's Core.",
@@ -10,11 +11,11 @@
 			"authors": ["TajemnikTV"],
 			"tags": ["qol", "tools"],
 			"description_rich": "",
-			"optional_dependencies": [],
+			"optional_dependencies": ["TajemnikTV-CommandPalette"],
 			"load_before": [],
 			"incompatibilities": [],
 			"compatible_mod_loader_version": ["7.0.0"],
-			"compatible_game_version": ["2.0.21"],
+			"compatible_game_version": ["2.1.7"],
 			"config_schema": {}
 		}
 	}
