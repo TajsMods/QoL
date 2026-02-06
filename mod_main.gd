@@ -71,6 +71,7 @@ const SETTING_GROUP_PATTERNS_DATA := "%s.group_patterns" % SETTINGS_PREFIX
 const SETTING_GROUP_LOCK_DATA := "%s.group_lock_data" % SETTINGS_PREFIX
 const SETTING_COLOR_PICKER_DATA := "%s.color_picker" % SETTINGS_PREFIX
 const SETTING_HIDE_PURCHASED_TOKENS := "%s.hide_purchased_tokens" % SETTINGS_PREFIX
+const SETTING_DELETE_CONFIRM_THRESHOLD := "%s.delete_confirm_threshold" % SETTINGS_PREFIX
 const SETTING_CONTEXT_RADIAL_ENABLED := "%s.context_radial_enabled" % SETTINGS_PREFIX
 const SETTING_SCHEMATIC_LEGACY_VIEW := "%s.schematic_legacy_view" % SETTINGS_PREFIX
 
@@ -110,6 +111,7 @@ const SETTINGS_KEYS := [
     SETTING_GROUP_PATTERNS_ENABLED,
     SETTING_GROUP_COLOR_PICKER_ENABLED,
     SETTING_GROUP_PATTERNS_DATA,
+    SETTING_DELETE_CONFIRM_THRESHOLD,
     SETTING_CONTEXT_RADIAL_ENABLED,
     SETTING_SCHEMATIC_LEGACY_VIEW
 ]
@@ -256,6 +258,16 @@ func _register_settings() -> void:
             "description": "Add extra input slots to Inventory and Bin windows.",
             "category": "Quality of Life",
             "requires_restart": true
+        },
+        SETTING_DELETE_CONFIRM_THRESHOLD: {
+            "type": "int",
+            "default": 20,
+            "label": "Large Delete Confirmation Threshold",
+            "description": "Require checkbox confirmation when deleting this many selected windows or more.",
+            "category": "Quality of Life",
+            "min": 1,
+            "max": 500,
+            "step": 1
         },
         SETTING_GOTO_GROUP_BUTTON_ENABLED: {
             "type": "bool",

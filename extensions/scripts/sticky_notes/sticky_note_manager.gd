@@ -28,10 +28,14 @@ var _debug_enabled := false
 # Undo State Tracking
 var _note_drag_start_pos: Dictionary = {} # note_id -> Vector2
 var _note_edit_start_data: Dictionary = {} # note_id -> Dictionary
+var _bulk_drag_start_positions: Dictionary = {} # note_id -> Vector2
+var _drag_signals_connected: bool = false
+var _drag_signal_connect_attempts: int = 0
 
 func setup(config, _tree: SceneTree, mod_main = null) -> void:
     _config = config
     _mod_main = mod_main
+    call_deferred("_connect_drag_signals_deferred")
 
     # Try to initialize immediately, or defer if not ready
     if not _try_initialize():
@@ -180,6 +184,38 @@ func _connect_note_signals(note: Control) -> void:
     note.drag_ended.connect(_on_note_drag_ended.bind(note.note_id))
     note.selection_changed.connect(_on_note_selection_changed.bind(note.note_id))
 
+func _connect_drag_signals() -> void:
+    if _drag_signals_connected:
+        return
+    var signals_node = _get_signals_node()
+    if signals_node == null:
+        return
+    if not signals_node.has_signal("begin_drag") or not signals_node.has_signal("drag_selection") or not signals_node.has_signal("dragged"):
+        return
+    if not signals_node.begin_drag.is_connected(_on_global_begin_drag):
+        signals_node.begin_drag.connect(_on_global_begin_drag)
+    if not signals_node.drag_selection.is_connected(_on_global_drag_selection):
+        signals_node.drag_selection.connect(_on_global_drag_selection)
+    if not signals_node.dragged.is_connected(_on_global_dragged):
+        signals_node.dragged.connect(_on_global_dragged)
+    _drag_signals_connected = true
+
+func _connect_drag_signals_deferred() -> void:
+    if _drag_signals_connected:
+        return
+    if get_tree() == null:
+        return
+    await get_tree().process_frame
+    _connect_drag_signals()
+    if not _drag_signals_connected and _drag_signal_connect_attempts < 60:
+        _drag_signal_connect_attempts += 1
+        call_deferred("_connect_drag_signals_deferred")
+
+func _get_signals_node() -> Node:
+    if get_tree() == null or get_tree().root == null:
+        return null
+    return get_tree().root.get_node_or_null("Signals")
+
 # ==============================================================================
 # SIGNAL HANDLERS & UNDO LOGIC
 # ==============================================================================
@@ -236,6 +272,65 @@ func _on_note_selection_changed(selected: bool, note_id: String) -> void:
                     var cmd = StickyNoteChangedCommandScript.new()
                     cmd.setup(self , note_id, before, after)
                     _get_undo_manager().push_command(cmd)
+
+func _on_global_begin_drag() -> void:
+    _bulk_drag_start_positions.clear()
+    for note in get_all_notes():
+        if note == null or not note.has_method("is_selected"):
+            continue
+        if note.is_selected():
+            _bulk_drag_start_positions[note.note_id] = note.position
+
+func _on_global_drag_selection(from: Vector2, to: Vector2) -> void:
+    if _bulk_drag_start_positions.is_empty():
+        return
+    var delta := to - from
+    for note_id in _bulk_drag_start_positions.keys():
+        if not _notes.has(note_id):
+            continue
+        var note = _notes[note_id]
+        if not is_instance_valid(note):
+            continue
+        var start_pos: Vector2 = _bulk_drag_start_positions[note_id]
+        note.position = (start_pos + delta).snappedf(50)
+        if note.has_method("_update_handle_positions"):
+            note._update_handle_positions()
+
+func _on_global_dragged(_window: WindowContainer) -> void:
+    _finalize_bulk_drag()
+
+func begin_selection_drag() -> void:
+    _on_global_begin_drag()
+
+func update_selection_drag(from: Vector2, to: Vector2) -> void:
+    _on_global_drag_selection(from, to)
+
+func finish_selection_drag() -> void:
+    _finalize_bulk_drag()
+
+func _finalize_bulk_drag() -> void:
+    if _bulk_drag_start_positions.is_empty():
+        return
+    var undo_manager = _get_undo_manager()
+    var changed := false
+    for note_id in _bulk_drag_start_positions.keys():
+        if not _notes.has(note_id):
+            continue
+        var note = _notes[note_id]
+        if not is_instance_valid(note):
+            continue
+        var start_pos: Vector2 = _bulk_drag_start_positions[note_id]
+        var end_pos: Vector2 = note.position
+        if start_pos.distance_to(end_pos) <= 1.0:
+            continue
+        changed = true
+        if undo_manager != null:
+            var cmd = StickyNoteMovedCommandScript.new()
+            cmd.setup(self, note_id, start_pos, end_pos)
+            undo_manager.push_command(cmd)
+    if changed:
+        save_notes()
+    _bulk_drag_start_positions.clear()
 
 
 func _get_undo_manager():
@@ -322,6 +417,14 @@ func get_all_notes() -> Array:
         if is_instance_valid(_notes[note_id]):
             result.append(_notes[note_id])
     return result
+
+func select_all_notes() -> int:
+    var selected := 0
+    for note in get_all_notes():
+        if note != null and note.has_method("_set_selected"):
+            note._set_selected(true)
+            selected += 1
+    return selected
 
 func navigate_to_note(note: Control) -> void:
     if not is_instance_valid(note): return

@@ -83,6 +83,13 @@ var _resize_start_mouse := Vector2.ZERO
 var _min_size := Vector2(200, 100)
 var _is_hovered := false
 var _is_selected := false: set = _set_selected
+var _is_group_dragging := false
+var _group_drag_from := Vector2.ZERO
+var _pending_deselect_on_release := false
+var _pending_deselect_start := Vector2.ZERO
+var _body_pan_active := false
+var _body_pan_dragging := false
+var _body_pan_start := Vector2.ZERO
 
 # Manager reference
 var _manager = null
@@ -486,6 +493,9 @@ func _set_selected(value: bool) -> void:
 
         selection_changed.emit(_is_selected)
 
+func is_selected() -> bool:
+    return _is_selected
+
 func _update_visual_state() -> void:
     # Show/Hide handles based on selection
     for dir in _resize_handles:
@@ -529,19 +539,47 @@ func _gui_input(event: InputEvent) -> void:
         Signals.unhandled_input.emit(event, Vector2.ZERO)
 
 func _input(event: InputEvent) -> void:
-    if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-        if _is_selected:
-            # Check if click is on any handle.
-            var local_mouse = get_local_mouse_position()
-            var on_handle = false
-            for dir in _resize_handles:
-                var handle = _resize_handles[dir]
-                if handle.get_rect().has_point(local_mouse):
-                    on_handle = true
-                    break
+    if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+        if event.pressed:
+            _pending_deselect_on_release = false
+            if _is_selected:
+                # Check if click is on any handle.
+                var local_mouse = get_local_mouse_position()
+                var on_handle = false
+                for dir in _resize_handles:
+                    var handle = _resize_handles[dir]
+                    if handle.get_rect().has_point(local_mouse):
+                        on_handle = true
+                        break
 
-            if not get_global_rect().has_point(get_global_mouse_position()) and not on_handle:
-                _set_selected(false)
+                if not get_global_rect().has_point(get_global_mouse_position()) and not on_handle:
+                    if _is_clicking_selected_window():
+                        return
+                    _pending_deselect_on_release = true
+                    _pending_deselect_start = get_global_mouse_position()
+        else:
+            if _pending_deselect_on_release:
+                var moved := _pending_deselect_start.distance_to(get_global_mouse_position())
+                if moved <= 8.0 and not _is_clicking_selected_window():
+                    _set_selected(false)
+            _pending_deselect_on_release = false
+    elif event is InputEventMouseMotion and _pending_deselect_on_release:
+        if _pending_deselect_start.distance_to(get_global_mouse_position()) > 8.0:
+            _pending_deselect_on_release = false
+
+func _is_clicking_selected_window() -> bool:
+    if Globals != null and Globals.dragging:
+        return true
+    var viewport := get_viewport()
+    if viewport == null:
+        return false
+    var hovered: Node = viewport.gui_get_hovered_control()
+    while hovered != null:
+        if hovered is WindowContainer:
+            var hovered_window := hovered as WindowContainer
+            return Globals != null and Globals.selections.has(hovered_window)
+        hovered = hovered.get_parent()
+    return false
 
 const GRID_SIZE = 50.0
 
@@ -678,46 +716,87 @@ func _on_title_panel_input(event: InputEvent) -> void:
             return
         if event.button_index == MOUSE_BUTTON_LEFT:
             if event.pressed:
-                _is_dragging = true
-                _drag_offset = get_global_mouse_position() - global_position
-                drag_started.emit()
                 _set_selected(true)
+                _is_dragging = true
+                if _should_group_drag_selection():
+                    _is_group_dragging = true
+                    _group_drag_from = get_global_mouse_position()
+                    Signals.begin_drag.emit()
+                    if _manager != null and _manager.has_method("begin_selection_drag"):
+                        _manager.begin_selection_drag()
+                else:
+                    _is_group_dragging = false
+                    _drag_offset = get_global_mouse_position() - global_position
+                    drag_started.emit()
             else:
                 if _is_dragging:
                     _is_dragging = false
-                    global_position = global_position.snappedf(GRID_SIZE)
-                    _update_handle_positions()
-                    drag_ended.emit()
-                    _emit_changed()
+                    if _is_group_dragging:
+                        _is_group_dragging = false
+                        if _manager != null and _manager.has_method("finish_selection_drag"):
+                            _manager.finish_selection_drag()
+                    else:
+                        global_position = global_position.snappedf(GRID_SIZE)
+                        _update_handle_positions()
+                        drag_ended.emit()
+                        _emit_changed()
             accept_event()
 
     elif event is InputEventMouseMotion and _is_dragging:
-        var new_pos = get_global_mouse_position() - _drag_offset
-        global_position = new_pos.snappedf(GRID_SIZE)
-        _update_handle_positions()
+        if _is_group_dragging:
+            var to_pos: Vector2 = get_global_mouse_position()
+            Signals.drag_selection.emit(_group_drag_from, to_pos)
+            if _manager != null and _manager.has_method("update_selection_drag"):
+                _manager.update_selection_drag(_group_drag_from, to_pos)
+        else:
+            var new_pos = get_global_mouse_position() - _drag_offset
+            global_position = new_pos.snappedf(GRID_SIZE)
+            _update_handle_positions()
         accept_event()
 
     # Handle touch events for dragging - DO NOT forward to camera
     elif event is InputEventScreenTouch:
         if event.pressed:
-            _is_dragging = true
-            _drag_offset = event.position - global_position
-            drag_started.emit()
             _set_selected(true)
+            _is_dragging = true
+            if _should_group_drag_selection():
+                _is_group_dragging = true
+                _group_drag_from = event.position
+                Signals.begin_drag.emit()
+                if _manager != null and _manager.has_method("begin_selection_drag"):
+                    _manager.begin_selection_drag()
+            else:
+                _is_group_dragging = false
+                _drag_offset = event.position - global_position
+                drag_started.emit()
         else:
             if _is_dragging:
                 _is_dragging = false
-                global_position = global_position.snappedf(GRID_SIZE)
-                _update_handle_positions()
-                drag_ended.emit()
-                _emit_changed()
+                if _is_group_dragging:
+                    _is_group_dragging = false
+                    if _manager != null and _manager.has_method("finish_selection_drag"):
+                        _manager.finish_selection_drag()
+                else:
+                    global_position = global_position.snappedf(GRID_SIZE)
+                    _update_handle_positions()
+                    drag_ended.emit()
+                    _emit_changed()
         accept_event()
 
     elif event is InputEventScreenDrag and _is_dragging:
-        var new_pos = event.position - _drag_offset
-        global_position = new_pos.snappedf(GRID_SIZE)
-        _update_handle_positions()
+        if _is_group_dragging:
+            var to_pos: Vector2 = event.position
+            Signals.drag_selection.emit(_group_drag_from, to_pos)
+            if _manager != null and _manager.has_method("update_selection_drag"):
+                _manager.update_selection_drag(_group_drag_from, to_pos)
+        else:
+            var new_pos = event.position - _drag_offset
+            global_position = new_pos.snappedf(GRID_SIZE)
+            _update_handle_positions()
         accept_event()
+
+func _should_group_drag_selection() -> bool:
+    return _is_selected and Globals != null and not Globals.selections.is_empty()
 
 func _on_duplicate_pressed() -> void:
     _play_sound("click2")
@@ -757,12 +836,30 @@ func _on_view_gui_input(event: InputEvent) -> void:
             Signals.unhandled_input.emit(event, global_position)
             accept_event()
             return
-        if event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-            if event.double_click:
-                _set_edit_mode(true)
+        if event.button_index == MOUSE_BUTTON_LEFT:
+            if event.pressed:
+                if event.double_click:
+                    _set_edit_mode(true)
+                    accept_event()
+                    return
+                _set_selected(true)
+                _body_pan_active = true
+                _body_pan_dragging = false
+                _body_pan_start = get_global_mouse_position()
                 accept_event()
             else:
-                _set_selected(true)
+                if _body_pan_active and _body_pan_dragging:
+                    Signals.unhandled_input.emit(event, global_position)
+                    accept_event()
+                _body_pan_active = false
+                _body_pan_dragging = false
+    elif event is InputEventMouseMotion:
+        if _body_pan_active and event.button_mask == MOUSE_BUTTON_LEFT:
+            if not _body_pan_dragging and _body_pan_start.distance_to(get_global_mouse_position()) > 6.0:
+                _body_pan_dragging = true
+            if _body_pan_dragging:
+                Signals.unhandled_input.emit(event, global_position)
+                accept_event()
     # Forward screen touch/drag for panning (use Vector2.ZERO for correct speed)
     elif event is InputEventScreenTouch or event is InputEventScreenDrag:
         Signals.unhandled_input.emit(event, Vector2.ZERO)
