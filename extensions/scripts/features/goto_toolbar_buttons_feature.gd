@@ -7,6 +7,7 @@ const NOTE_COMMAND_ID := "tajs_qol.goto_note"
 const GROUP_ICON_PATH := "res://textures/icons/crosshair.png"
 const NOTE_ICON_PATH := "res://textures/icons/document.png"
 const TOOLS_PATH := "Main/HUD/Main/MainContainer/Overlay/ToolsBar/Tools"
+const MENUS_PATH := "Main/HUD/Main/MainContainer/Overlay/Menus"
 const SEPARATOR_NODE_NAME := "QolToolsSeparator"
 
 const VANILLA_TOOL_NAMES := [
@@ -27,6 +28,8 @@ var _core = null
 var _initialized: bool = false
 var _group_enabled: bool = true
 var _note_enabled: bool = true
+var _number_shortcuts_enabled: bool = true
+var _modifier_shortcuts_enabled: bool = true
 
 var _group_button: Button = null
 var _note_button: Button = null
@@ -49,6 +52,45 @@ func set_group_button_enabled(enabled: bool) -> void:
 func set_note_button_enabled(enabled: bool) -> void:
     _note_enabled = enabled
     _update_button_visibility()
+
+
+func set_number_shortcuts_enabled(enabled: bool) -> void:
+    _number_shortcuts_enabled = enabled
+
+
+func set_modifier_shortcuts_enabled(enabled: bool) -> void:
+    _modifier_shortcuts_enabled = enabled
+
+
+func activate_shortcut_slot(slot: int, use_modifier_layer: bool) -> bool:
+    if slot < 1 or slot > 9:
+        return false
+    if not _number_shortcuts_enabled:
+        return false
+    if use_modifier_layer and not _modifier_shortcuts_enabled:
+        return false
+    if _is_text_input_focused() or _is_modal_open():
+        return false
+
+    var buttons = _get_shortcut_buttons()
+    if buttons.is_empty():
+        return false
+
+    var target_index := slot - 1
+    if use_modifier_layer:
+        target_index += 9
+    if target_index < 0 or target_index >= buttons.size():
+        return false
+
+    var target_button = buttons[target_index]
+    if target_button == null or not is_instance_valid(target_button):
+        return false
+    if not target_button.visible or target_button.disabled:
+        return false
+
+    target_button.emit_signal("pressed")
+    _play_sound("click2")
+    return true
 
 
 func _check_existing_desktop() -> void:
@@ -264,6 +306,88 @@ func _play_sound(sound_id: String) -> void:
     var sound = _get_autoload("Sound")
     if sound != null and sound.has_method("play"):
         sound.call("play", sound_id)
+
+
+func _get_shortcut_buttons() -> Array:
+    var menu_buttons = _get_active_menu_buttons()
+    if not menu_buttons.is_empty():
+        return menu_buttons
+    return _collect_buttons(_get_tools_container())
+
+
+func _get_active_menu_buttons() -> Array:
+    var tree = get_tree()
+    if tree == null:
+        return []
+    var menus_root = tree.root.get_node_or_null(MENUS_PATH)
+    if menus_root == null:
+        return []
+
+    var queue: Array = [menus_root]
+    var best_buttons: Array = []
+    while not queue.is_empty():
+        var node = queue.pop_front()
+        if node == null or not (node is Control):
+            continue
+        var control := node as Control
+        if not control.visible:
+            continue
+
+        if node is HBoxContainer:
+            var row_buttons = _collect_buttons(node)
+            if row_buttons.size() >= 2 and _is_tab_like_row(row_buttons):
+                if row_buttons.size() > best_buttons.size():
+                    best_buttons = row_buttons
+
+        for child in node.get_children():
+            if child is Control:
+                queue.append(child)
+
+    return best_buttons
+
+
+func _is_tab_like_row(buttons: Array) -> bool:
+    var toggle_count := 0
+    for button in buttons:
+        if button is Button and button.toggle_mode:
+            toggle_count += 1
+    return toggle_count > 0
+
+
+func _collect_buttons(container) -> Array:
+    if container == null:
+        return []
+    var buttons: Array = []
+    for child in container.get_children():
+        if child is Button and child.visible:
+            buttons.append(child)
+    return buttons
+
+
+func _is_text_input_focused() -> bool:
+    var viewport = get_viewport()
+    if viewport == null:
+        return false
+    var focus: Control = viewport.gui_get_focus_owner()
+    if focus == null:
+        return false
+    return focus is LineEdit or focus is TextEdit or focus is CodeEdit or focus is SpinBox
+
+
+func _is_modal_open() -> bool:
+    var tree = get_tree()
+    if tree == null:
+        return false
+    return _has_visible_popup(tree.root)
+
+
+func _has_visible_popup(node: Node) -> bool:
+    if node is Popup and node.visible:
+        return true
+    for child in node.get_children():
+        if _has_visible_popup(child):
+            return true
+    return false
 
 
 func _get_autoload(autoload_name: String) -> Node:

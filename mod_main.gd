@@ -36,6 +36,8 @@ const SETTING_DISABLE_SLIDER_SCROLL := "%s.disable_slider_scroll" % SETTINGS_PRE
 const SETTING_EXTRA_INPUTS_ENABLED := "%s.extra_inputs_enabled" % SETTINGS_PREFIX
 const SETTING_GOTO_GROUP_BUTTON_ENABLED := "%s.goto_group_button_enabled" % SETTINGS_PREFIX
 const SETTING_GOTO_NOTE_BUTTON_ENABLED := "%s.goto_note_button_enabled" % SETTINGS_PREFIX
+const SETTING_NUMBER_SHORTCUTS_ENABLED := "%s.number_shortcuts_enabled" % SETTINGS_PREFIX
+const SETTING_MODIFIER_NUMBER_SHORTCUTS_ENABLED := "%s.modifier_number_shortcuts_enabled" % SETTINGS_PREFIX
 const SETTING_UNDO_REDO_BUTTONS_ENABLED := "%s.undo_redo_buttons_enabled" % SETTINGS_PREFIX
 const SETTING_FOCUS_MUTE_ENABLED := "%s.focus_mute_enabled" % SETTINGS_PREFIX
 const SETTING_FOCUS_BG_VOLUME := "%s.focus_background_volume" % SETTINGS_PREFIX
@@ -80,6 +82,8 @@ const SETTINGS_KEYS := [
     SETTING_EXTRA_INPUTS_ENABLED,
     SETTING_GOTO_GROUP_BUTTON_ENABLED,
     SETTING_GOTO_NOTE_BUTTON_ENABLED,
+    SETTING_NUMBER_SHORTCUTS_ENABLED,
+    SETTING_MODIFIER_NUMBER_SHORTCUTS_ENABLED,
     SETTING_UNDO_REDO_BUTTONS_ENABLED,
     SETTING_FOCUS_MUTE_ENABLED,
     SETTING_FOCUS_BG_VOLUME,
@@ -266,6 +270,21 @@ func _register_settings() -> void:
             "label": "Go To Sticky Note Button",
             "description": "Show the Go To Sticky Note button near Undo/Redo in the tools bar.",
             "category": "Quality of Life"
+        },
+        SETTING_NUMBER_SHORTCUTS_ENABLED: {
+            "type": "bool",
+            "default": true,
+            "label": "Number Key Menu Shortcuts",
+            "description": "Use 1-9 to activate toolbar/menu tabs from left to right.",
+            "category": "Input"
+        },
+        SETTING_MODIFIER_NUMBER_SHORTCUTS_ENABLED: {
+            "type": "bool",
+            "default": true,
+            "label": "Modifier Layer for Number Shortcuts",
+            "description": "Use Shift+1-9 to trigger alternate slots 10-18.",
+            "category": "Input",
+            "depends_on": {"key": SETTING_NUMBER_SHORTCUTS_ENABLED, "equals": true}
         },
         SETTING_UNDO_REDO_BUTTONS_ENABLED: {
             "type": "bool",
@@ -680,6 +699,8 @@ func _init_features() -> void:
         SETTING_CONTROLLER_BLOCK_ENABLED: func(value): _controller_block.set_enabled(bool(value)),
         SETTING_GOTO_GROUP_BUTTON_ENABLED: func(value): if _goto_toolbar_buttons != null: _goto_toolbar_buttons.set_group_button_enabled(bool(value)),
         SETTING_GOTO_NOTE_BUTTON_ENABLED: func(value): if _goto_toolbar_buttons != null: _goto_toolbar_buttons.set_note_button_enabled(bool(value)),
+        SETTING_NUMBER_SHORTCUTS_ENABLED: func(value): if _goto_toolbar_buttons != null: _goto_toolbar_buttons.set_number_shortcuts_enabled(bool(value)),
+        SETTING_MODIFIER_NUMBER_SHORTCUTS_ENABLED: func(value): if _goto_toolbar_buttons != null: _goto_toolbar_buttons.set_modifier_shortcuts_enabled(bool(value)),
         SETTING_UNDO_REDO_BUTTONS_ENABLED: func(value): if _undo_redo != null: _undo_redo.set_buttons_enabled(bool(value)),
         SETTING_SCREENSHOT_ENABLED: func(value): _set_screenshot_enabled(bool(value)),
         SETTING_SCREENSHOT_QUALITY: func(value): _screenshot.set_quality(int(value)),
@@ -823,6 +844,66 @@ func _register_keybinds() -> void:
         0,
         KEYBIND_CATEGORY_ID
     )
+    _register_toolbar_number_keybinds()
+
+
+func _register_toolbar_number_keybinds() -> void:
+    for slot in range(1, 10):
+        var keycode := _keycode_for_number_slot(slot)
+        _core.keybinds.register_action_scoped(
+            MOD_ID,
+            "toolbar_slot_%d" % slot,
+            "Toolbar/Menu Slot %d" % slot,
+            [_core.keybinds.make_key_event(keycode)],
+            _core.keybinds.CONTEXT_GAMEPLAY,
+            Callable(self, "_on_toolbar_number_slot").bind(slot),
+            0,
+            KEYBIND_CATEGORY_ID
+        )
+        _core.keybinds.register_action_scoped(
+            MOD_ID,
+            "toolbar_slot_modifier_%d" % slot,
+            "Toolbar/Menu Slot %d (Modifier)" % (slot + 9),
+            [_core.keybinds.make_key_event(keycode, false, true)],
+            _core.keybinds.CONTEXT_GAMEPLAY,
+            Callable(self, "_on_toolbar_number_slot_modifier").bind(slot),
+            0,
+            KEYBIND_CATEGORY_ID
+        )
+
+
+func _keycode_for_number_slot(slot: int) -> int:
+    match slot:
+        1:
+            return KEY_1
+        2:
+            return KEY_2
+        3:
+            return KEY_3
+        4:
+            return KEY_4
+        5:
+            return KEY_5
+        6:
+            return KEY_6
+        7:
+            return KEY_7
+        8:
+            return KEY_8
+        9:
+            return KEY_9
+        _:
+            return KEY_1
+
+
+func _on_toolbar_number_slot(slot: int) -> void:
+    if _goto_toolbar_buttons != null:
+        _goto_toolbar_buttons.activate_shortcut_slot(slot, false)
+
+
+func _on_toolbar_number_slot_modifier(slot: int) -> void:
+    if _goto_toolbar_buttons != null:
+        _goto_toolbar_buttons.activate_shortcut_slot(slot, true)
 
 
 func _register_commands() -> void:
