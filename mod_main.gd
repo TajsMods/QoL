@@ -161,17 +161,35 @@ var _startup_initialized: bool = false
 
 func _init() -> void:
     if _has_global_class("ModLoaderMod"):
-        ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/windows/window_group.gd")
-        ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/windows/window_inventory.gd")
-        ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/windows/window_bin.gd")
-        ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/windows/window_research_advanced.gd")
-        ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/options_bar.gd")
-        ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/camera_2d.gd")
-        ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/tokens_tab.gd")
-        ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/popup_schematic.gd")
-        ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/edit_group_popup.gd")
-        ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/schematic_container.gd")
-        ModLoaderMod.install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/schematics_menu.gd")
+        _safe_install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/windows/window_group.gd")
+        _safe_install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/windows/window_inventory.gd")
+        _safe_install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/windows/window_bin.gd")
+        _safe_install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/windows/window_research_advanced.gd")
+        _safe_install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/options_bar.gd")
+        _safe_install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/camera_2d.gd")
+        _safe_install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/tokens_tab.gd")
+        _safe_install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/popup_schematic.gd")
+        _safe_install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/edit_group_popup.gd")
+        if ResourceLoader.exists("res://scenes/schematic_button.gd"):
+            _safe_install_script_extension(
+                "res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/schematic_button.gd",
+                "res://scenes/schematic_button.gd"
+            )
+        else:
+            _safe_install_script_extension(
+                "res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/schematic_container.gd",
+                "res://scenes/schematic_container.gd"
+            )
+        if ResourceLoader.exists("res://scripts/schematics_tab.gd"):
+            _safe_install_script_extension(
+                "res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/schematics_menu.gd",
+                "res://scripts/schematics_tab.gd"
+            )
+        else:
+            _safe_install_script_extension(
+                "res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/schematics_menu.gd",
+                "res://scripts/schematics_menu.gd"
+            )
     _core = _get_core()
     if _core == null:
         _log_warn("Taj's Core not found; QoL disabled.")
@@ -1519,6 +1537,36 @@ func _log_warn(message: String) -> void:
         ModLoaderLog.warning(message, LOG_NAME)
     else:
         print("%s %s" % [LOG_NAME, message])
+
+
+func _safe_install_script_extension(extension_path: String, required_base_path: String = "") -> void:
+    if extension_path == "":
+        return
+    var base_path := required_base_path
+    if base_path == "":
+        base_path = _read_extension_base_script_path(extension_path)
+    if base_path != "" and not ResourceLoader.exists(base_path):
+        _log_warn("Skipping extension %s (missing base script: %s)" % [extension_path, base_path])
+        return
+    ModLoaderMod.install_script_extension(extension_path)
+
+
+func _read_extension_base_script_path(extension_path: String) -> String:
+    if extension_path == "":
+        return ""
+    if not FileAccess.file_exists(extension_path):
+        return ""
+    var file := FileAccess.open(extension_path, FileAccess.READ)
+    if file == null:
+        return ""
+    var first_line := file.get_line().strip_edges()
+    if not first_line.begins_with("extends \""):
+        return ""
+    var start := first_line.find("\"")
+    var ending := first_line.rfind("\"")
+    if start < 0 or ending <= start:
+        return ""
+    return first_line.substr(start + 1, ending - start - 1)
 
 
 static func _has_global_class(class_name_str: String) -> bool:

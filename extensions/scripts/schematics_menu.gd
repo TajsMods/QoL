@@ -1,5 +1,5 @@
 class_name TajsQoLSchematicsMenu
-extends "res://scripts/schematics_menu.gd"
+extends "res://scripts/schematics_tab.gd"
 
 const MetadataStoreScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/schematic_library/metadata_store.gd")
 const SchematicListRowScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/schematic_library/ui/schematic_list_row.gd")
@@ -18,6 +18,7 @@ const ALL_CATEGORIES := "All"
 
 var _metadata_store
 var _settings
+var open: bool = false
 
 var _legacy_container: Control
 var _root_margin: MarginContainer
@@ -82,7 +83,11 @@ var _suppress_detail_events: bool = false
 
 func _ready() -> void:
     super._ready()
-    _legacy_container = $MarginContainer
+    _legacy_container = get_node_or_null("MarginContainer")
+    if _legacy_container == null:
+        _legacy_container = get_node_or_null("SchematicsContainer")
+    if _legacy_container == null:
+        _legacy_container = self
     _metadata_store = MetadataStoreScript.new()
     var core = Engine.get_meta("TajsCore", null)
     if core != null and core.has_method("get"):
@@ -1737,7 +1742,8 @@ func _on_legacy_toggled(value: bool) -> void:
 
 
 func _apply_legacy_mode() -> void:
-    _legacy_container.visible = _legacy_enabled
+    if _legacy_container != null:
+        _legacy_container.visible = _legacy_enabled
     _custom_body.visible = not _legacy_enabled
     _toolbar_left.visible = not _legacy_enabled
 
