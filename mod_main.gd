@@ -156,6 +156,7 @@ var _settings_ui_built: bool = false
 var _color_picker_layer: CanvasLayer = null
 var _color_picker_panel: Control = null
 var _color_picker_callback: Callable = Callable()
+var _startup_initialized: bool = false
 
 
 func _init() -> void:
@@ -181,20 +182,24 @@ func _init() -> void:
     _settings = _core.settings
     _register_module()
     _register_settings()
-    _init_features()
-    _register_keybinds()
-    _register_commands()
-    _register_events()
-    _apply_initial_settings()
 
 
 func _ready() -> void:
+    if _core == null:
+        return
+    if not _startup_initialized:
+        _startup_initialized = true
+        _init_features()
+        _register_keybinds()
+        _register_commands()
+        _register_events()
     if _screenshot != null:
         _screenshot.set_tree(get_tree())
     if _screenshot_toolbar != null:
         _screenshot_toolbar.set_tree(get_tree())
     if _wire_colors != null:
         _wire_colors.set_tree(get_tree())
+    _apply_initial_settings()
     # Settings UI is auto-generated from schema in Core.
 
 
@@ -623,35 +628,35 @@ func _init_features() -> void:
     _smart_select.setup(_core)
 
     _wire_clear = WireClearFeatureScript.new()
-    _wire_clear.setup(_core)
     add_child(_wire_clear)
+    _wire_clear.setup(_core)
 
     _wire_drop = WireDropFeatureScript.new()
-    _wire_drop.setup(_core)
     add_child(_wire_drop)
+    _wire_drop.setup(_core)
 
     _slider_scroll_block = SliderScrollBlockFeatureScript.new()
-    _slider_scroll_block.setup()
     add_child(_slider_scroll_block)
+    _slider_scroll_block.setup()
 
     _focus_mute = FocusMuteFeatureScript.new()
-    _focus_mute.setup()
     add_child(_focus_mute)
+    _focus_mute.setup()
 
     _controller_block = ControllerBlockFeatureScript.new()
-    _controller_block.setup()
     add_child(_controller_block)
+    _controller_block.setup()
 
     _notification_history = NotificationHistoryFeatureScript.new()
-    _notification_history.setup(_core)
     add_child(_notification_history)
+    _notification_history.setup(_core)
 
     _screenshot = ScreenshotFeatureScript.new()
     _screenshot.setup(_core)
 
     _screenshot_toolbar = ScreenshotToolbarFeatureScript.new()
-    _screenshot_toolbar.setup(_core, Callable(self, "_on_screenshot_full"), Callable(self, "_on_screenshot_selection"))
     add_child(_screenshot_toolbar)
+    _screenshot_toolbar.setup(_core, Callable(self, "_on_screenshot_full"), Callable(self, "_on_screenshot_selection"))
 
     _wire_colors = WireColorsFeatureScript.new()
     _wire_colors.setup(_core)
@@ -660,39 +665,39 @@ func _init_features() -> void:
     _visual_effects.setup(_core)
 
     _disconnected_highlight = DisconnectedHighlightFeatureScript.new()
-    _disconnected_highlight.setup(_core)
     add_child(_disconnected_highlight)
+    _disconnected_highlight.setup(_core)
 
     _group_patterns = GroupPatternsFeatureScript.new()
 
     _group_layer = GroupLayerFeatureScript.new()
-    _group_layer.setup(_core)
     add_child(_group_layer)
+    _group_layer.setup(_core)
 
     _undo_redo = UndoRedoFeatureScript.new()
-    _undo_redo.setup(_core)
     add_child(_undo_redo)
+    _undo_redo.setup(_core)
 
     _goto_toolbar_buttons = GotoToolbarButtonsFeatureScript.new()
-    _goto_toolbar_buttons.setup(_core)
     add_child(_goto_toolbar_buttons)
+    _goto_toolbar_buttons.setup(_core)
 
     _goto_group_manager = GotoGroupManagerScript.new()
+    add_child(_goto_group_manager)
     if _goto_group_manager.has_method("setup"):
         _goto_group_manager.setup(_core)
-    add_child(_goto_group_manager)
     if _core != null and _core.has_method("extend_globals"):
         _core.extend_globals("goto_group_manager", _goto_group_manager)
 
     _sticky_note_manager = StickyNoteManagerScript.new()
-    _sticky_note_manager.setup(_settings, get_tree(), self )
     add_child(_sticky_note_manager)
+    _sticky_note_manager.setup(_settings, get_tree(), self )
     if _core != null and _core.has_method("extend_globals"):
         _core.extend_globals("sticky_note_manager", _sticky_note_manager)
 
     _context_radial = ContextRadialFeatureScript.new()
-    _context_radial.setup(_core)
     add_child(_context_radial)
+    _context_radial.setup(_core)
 
     _context_menu_provider = ContextMenuProviderScript.new()
     _context_menu_provider.setup(_core, _sticky_note_manager)

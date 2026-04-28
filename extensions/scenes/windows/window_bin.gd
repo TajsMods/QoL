@@ -59,8 +59,8 @@ func _ready() -> void:
         enable_tick.call(extra_input)
 
 
-func process(delta: float) -> void:
-    super.process(delta)
+func _process(delta: float) -> void:
+    super._process(delta)
     for extra_input in _extra_inputs:
         if extra_input.has_method("pop_all"):
             extra_input.pop_all()

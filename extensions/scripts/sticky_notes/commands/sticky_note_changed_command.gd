@@ -54,7 +54,7 @@ func undo() -> bool:
     return false
 
 ## Merge with subsequent command
-func merge_with(other: RefCounted) -> bool:
+func merge_with(other: Variant) -> bool:
     # Check if other is same type (we can't easily check class_name if it's script, but we can check script path or duck type)
     if other.get_script() != get_script():
         return false

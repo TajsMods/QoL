@@ -133,7 +133,10 @@ func set_qol_color_picker_enabled(enabled: bool) -> void:
 func update_color() -> void:
     if not _patterns_enabled:
         color = clampi(color, 0, VANILLA_COLORS.size() - 1)
-        super.update_color()
+        var base_color := Color(VANILLA_COLORS[color])
+        $TitlePanel.self_modulate = base_color
+        $PanelContainer.self_modulate = base_color
+        queue_redraw()
         return
     if not _color_picker_enabled:
         color = clampi(color, 0, VANILLA_COLORS.size() - 1)
@@ -181,8 +184,7 @@ func _setup_color_picker() -> void:
     if not _color_picker_enabled:
         return
     if _color_picker_layer != null:
-        if not _color_picker_layer.is_inside_tree() and get_tree() != null:
-            get_tree().root.call_deferred("add_child", _color_picker_layer)
+        _ensure_layer_attached(_color_picker_layer)
         if _color_picker == null:
             _create_color_picker_panel()
         return
@@ -191,7 +193,7 @@ func _setup_color_picker() -> void:
     _color_picker_layer.layer = 100
     _color_picker_layer.visible = false
     if get_tree() != null:
-        get_tree().root.call_deferred("add_child", _color_picker_layer)
+        _ensure_layer_attached(_color_picker_layer)
     else:
         call_deferred("_ensure_color_picker_in_tree")
 
@@ -228,14 +230,12 @@ func _create_color_picker_panel() -> void:
 
 
 func _ensure_color_picker_in_tree() -> void:
-    if _color_picker_layer != null and not _color_picker_layer.is_inside_tree() and get_tree() != null:
-        get_tree().root.call_deferred("add_child", _color_picker_layer)
+    _ensure_layer_attached(_color_picker_layer)
 
 
 func _setup_pattern_picker() -> void:
     if _pattern_picker_layer != null:
-        if not _pattern_picker_layer.is_inside_tree() and get_tree() != null:
-            get_tree().root.call_deferred("add_child", _pattern_picker_layer)
+        _ensure_layer_attached(_pattern_picker_layer)
         _add_pattern_button()
         return
     _pattern_picker_layer = CanvasLayer.new()
@@ -264,8 +264,21 @@ func _setup_pattern_picker() -> void:
     _pattern_picker_layer.add_child(_pattern_picker)
 
     if get_tree() != null:
-        get_tree().root.call_deferred("add_child", _pattern_picker_layer)
+        _ensure_layer_attached(_pattern_picker_layer)
     _add_pattern_button()
+
+
+func _ensure_layer_attached(layer: CanvasLayer) -> void:
+    if layer == null:
+        return
+    var tree := get_tree()
+    if tree == null or tree.root == null:
+        return
+    if layer.get_parent() == tree.root:
+        return
+    if layer.get_parent() != null:
+        return
+    tree.root.call_deferred("add_child", layer)
 
 
 func _ensure_pattern_ui() -> void:

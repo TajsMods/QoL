@@ -47,7 +47,7 @@ func undo() -> bool:
 
 
 ## Merge with subsequent command
-func merge_with(other: RefCounted) -> bool:
+func merge_with(other: Variant) -> bool:
     if other.get_script() != get_script():
         return false
 
