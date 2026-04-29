@@ -265,7 +265,14 @@ func _setup_color_picker():
     _color_picker = ColorPickerPanelScript.new()
     _color_picker.name = "PatternColorPicker"
     if _color_picker.has_method("setup"):
-        _color_picker.call("setup", _get_core_settings(), "tajs_qol.color_picker")
+        var settings_target = _get_core_settings()
+        if Engine.has_meta("TajsCore"):
+            var core = Engine.get_meta("TajsCore")
+            if core != null and core.has_method("get_extended_global"):
+                var store = core.get_extended_global("qol_data_store", null)
+                if store != null and store.has_method("get_color_picker_proxy"):
+                    settings_target = store.get_color_picker_proxy()
+        _color_picker.call("setup", settings_target, "color_picker")
     _color_picker.set_color(_pattern_color)
     _color_picker.color_changed.connect(_on_color_picked)
     _color_picker.color_committed.connect(func(_c):

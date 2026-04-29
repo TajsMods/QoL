@@ -67,9 +67,6 @@ const SETTING_HIGHLIGHT_DISCONNECTED_STYLE := "%s.highlight_disconnected_style" 
 const SETTING_HIGHLIGHT_DISCONNECTED_INTENSITY := "%s.highlight_disconnected_intensity" % SETTINGS_PREFIX
 const SETTING_GROUP_PATTERNS_ENABLED := "%s.group_patterns_enabled" % SETTINGS_PREFIX
 const SETTING_GROUP_COLOR_PICKER_ENABLED := "%s.group_color_picker_enabled" % SETTINGS_PREFIX
-const SETTING_GROUP_PATTERNS_DATA := "%s.group_patterns" % SETTINGS_PREFIX
-const SETTING_GROUP_LOCK_DATA := "%s.group_lock_data" % SETTINGS_PREFIX
-const SETTING_COLOR_PICKER_DATA := "%s.color_picker" % SETTINGS_PREFIX
 const SETTING_HIDE_PURCHASED_TOKENS := "%s.hide_purchased_tokens" % SETTINGS_PREFIX
 const SETTING_DELETE_CONFIRM_THRESHOLD := "%s.delete_confirm_threshold" % SETTINGS_PREFIX
 const SETTING_CONTEXT_RADIAL_ENABLED := "%s.context_radial_enabled" % SETTINGS_PREFIX
@@ -110,17 +107,18 @@ const SETTINGS_KEYS := [
     SETTING_HIGHLIGHT_DISCONNECTED_INTENSITY,
     SETTING_GROUP_PATTERNS_ENABLED,
     SETTING_GROUP_COLOR_PICKER_ENABLED,
-    SETTING_GROUP_PATTERNS_DATA,
     SETTING_DELETE_CONFIRM_THRESHOLD,
     SETTING_CONTEXT_RADIAL_ENABLED,
     SETTING_SCHEMATIC_LEGACY_VIEW
 ]
 const StickyNoteManagerScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/sticky_notes/sticky_note_manager.gd")
+const QolDataStoreScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/persistence/qol_data_store.gd")
 
 var _core
 var _settings
 var _ui_manager
 var _sticky_note_manager
+var _data_store
 var _goto_group_manager
 var _palette_controller
 var _palette_overlay
@@ -596,30 +594,6 @@ func _register_settings() -> void:
             "category": "Visuals",
             "depends_on": {"key": SETTING_GROUP_PATTERNS_ENABLED, "equals": true}
         },
-        SETTING_GROUP_PATTERNS_DATA: {
-            "type": "dict",
-            "default": {},
-            "label": "Group Pattern Data",
-            "description": "Stored group pattern settings.",
-            "category": "Visuals",
-            "hidden": true
-        },
-        SETTING_GROUP_LOCK_DATA: {
-            "type": "dict",
-            "default": {},
-            "label": "Group Lock Data",
-            "description": "Stored group lock state.",
-            "category": "Quality of Life",
-            "hidden": true
-        },
-        SETTING_COLOR_PICKER_DATA: {
-            "type": "dict",
-            "default": {},
-            "label": "Color Picker Data",
-            "description": "Color picker swatches and recents.",
-            "category": "Visuals",
-            "hidden": true
-        },
         SETTING_HIDE_PURCHASED_TOKENS: {
             "type": "bool",
             "default": true,
@@ -634,6 +608,12 @@ func _register_settings() -> void:
 
 
 func _init_features() -> void:
+    _data_store = QolDataStoreScript.new()
+    _data_store.setup(_core, _settings)
+    _data_store.migrate_from_legacy()
+    if _core != null and _core.has_method("extend_globals"):
+        _core.extend_globals("qol_data_store", _data_store)
+
     _smart_select = SmartSelectFeatureScript.new()
     _smart_select.setup(_core)
 
@@ -701,7 +681,7 @@ func _init_features() -> void:
 
     _sticky_note_manager = StickyNoteManagerScript.new()
     add_child(_sticky_note_manager)
-    _sticky_note_manager.setup(_settings, get_tree(), self )
+    _sticky_note_manager.setup(_settings, get_tree(), self , _data_store)
     if _core != null and _core.has_method("extend_globals"):
         _core.extend_globals("sticky_note_manager", _sticky_note_manager)
 
@@ -1470,7 +1450,8 @@ func _ensure_color_picker() -> void:
 
     _color_picker_panel = CoreColorPickerPanelScript.new()
     if _color_picker_panel.has_method("setup"):
-        _color_picker_panel.call("setup", _settings, SETTING_COLOR_PICKER_DATA)
+        var cp_settings = _data_store.get_color_picker_proxy() if _data_store != null else _settings
+        _color_picker_panel.call("setup", cp_settings, "color_picker")
     _color_picker_panel.color_changed.connect(_on_color_picker_changed)
     _color_picker_panel.color_committed.connect(func(_c: Color):
         _close_color_picker()

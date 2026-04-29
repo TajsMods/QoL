@@ -1,9 +1,7 @@
 extends "res://scenes/windows/window_group.gd"
 
 const SETTINGS_ENABLED_KEY := "tajs_qol.group_patterns_enabled"
-const SETTINGS_DATA_KEY := "tajs_qol.group_patterns"
 const SETTINGS_COLOR_PICKER_ENABLED_KEY := "tajs_qol.group_color_picker_enabled"
-const SETTINGS_LOCK_DATA_KEY := "tajs_qol.group_lock_data"
 const DEFAULT_ICON_PATH := "res://textures/icons/window.png"
 
 const VANILLA_COLORS: Array[String] = ["1a202c", "1a2b22", "1a292b", "1a1b2b", "211a2b", "2b1a27", "2b1a1a"]
@@ -219,7 +217,8 @@ func _create_color_picker_panel() -> void:
     _color_picker = ColorPickerPanelScript.new()
     _color_picker.name = "QolColorPickerPanel"
     if _color_picker.has_method("setup"):
-        _color_picker.call("setup", _get_core_settings(), "tajs_qol.color_picker")
+        var proxy = _get_qol_data_store().get_color_picker_proxy() if _get_qol_data_store() != null else _get_core_settings()
+        _color_picker.call("setup", proxy, "color_picker")
     var initial_color = custom_color if custom_color != Color.TRANSPARENT else Color(VANILLA_COLORS[clampi(color, 0, VANILLA_COLORS.size() - 1)])
     _color_picker.set_color(initial_color)
     _color_picker.color_changed.connect(_on_color_picked)
@@ -469,10 +468,10 @@ func _load_from_settings() -> void:
 
 
 func _save_to_settings() -> void:
-    var settings = _get_core_settings()
-    if settings == null:
+    var store = _get_qol_data_store()
+    if store == null:
         return
-    var all_data: Dictionary = settings.get_dict(SETTINGS_DATA_KEY, {})
+    var all_data: Dictionary = store.read_data(store.FILE_GROUP_PATTERNS, {})
     var entry := {
         "pattern_index": pattern_index,
         "pattern_color": pattern_color.to_html(true),
@@ -483,14 +482,14 @@ func _save_to_settings() -> void:
     if custom_color != Color.TRANSPARENT:
         entry["custom_color"] = custom_color.to_html(true)
     all_data[_get_group_key()] = entry
-    settings.set_value(SETTINGS_DATA_KEY, all_data)
+    store.write_data(store.FILE_GROUP_PATTERNS, all_data, "group_patterns")
 
 
 func _get_group_data() -> Dictionary:
-    var settings = _get_core_settings()
-    if settings == null:
+    var store = _get_qol_data_store()
+    if store == null:
         return {}
-    var all_data: Dictionary = settings.get_dict(SETTINGS_DATA_KEY, {})
+    var all_data: Dictionary = store.read_data(store.FILE_GROUP_PATTERNS, {})
     var key := _get_group_key()
     var entry = all_data.get(key, {})
     if entry is Dictionary:
@@ -502,7 +501,7 @@ func _get_group_data() -> Dictionary:
         if legacy_entry is Dictionary:
             all_data[key] = legacy_entry
             all_data.erase(legacy_key)
-            settings.set_value(SETTINGS_DATA_KEY, all_data)
+            store.write_data(store.FILE_GROUP_PATTERNS, all_data, "group_patterns")
             return legacy_entry
 
     return {}
@@ -526,10 +525,10 @@ func qol_migrate_style_keys() -> void:
 
 
 func _migrate_pattern_settings_entry() -> void:
-    var settings = _get_core_settings()
-    if settings == null:
+    var store = _get_qol_data_store()
+    if store == null:
         return
-    var all_data: Dictionary = settings.get_dict(SETTINGS_DATA_KEY, {})
+    var all_data: Dictionary = store.read_data(store.FILE_GROUP_PATTERNS, {})
     var key := _get_group_key()
     var legacy_key := str(name)
     if legacy_key == "" or legacy_key == key:
@@ -543,19 +542,19 @@ func _migrate_pattern_settings_entry() -> void:
     if id_entry is Dictionary:
         if id_entry == legacy_entry:
             all_data.erase(legacy_key)
-            settings.set_value(SETTINGS_DATA_KEY, all_data)
+            store.write_data(store.FILE_GROUP_PATTERNS, all_data, "group_patterns")
         return
 
     all_data[key] = legacy_entry
     all_data.erase(legacy_key)
-    settings.set_value(SETTINGS_DATA_KEY, all_data)
+    store.write_data(store.FILE_GROUP_PATTERNS, all_data, "group_patterns")
 
 
 func _migrate_lock_settings_entry() -> void:
-    var settings = _get_core_settings()
-    if settings == null:
+    var store = _get_qol_data_store()
+    if store == null:
         return
-    var all_data: Dictionary = settings.get_dict(SETTINGS_LOCK_DATA_KEY, {})
+    var all_data: Dictionary = store.read_data(store.FILE_GROUP_LOCKS, {})
     var key := _get_group_key()
     var legacy_key := str(name)
     if legacy_key == "" or legacy_key == key:
@@ -569,19 +568,19 @@ func _migrate_lock_settings_entry() -> void:
     if id_entry is bool:
         if id_entry == legacy_entry:
             all_data.erase(legacy_key)
-            settings.set_value(SETTINGS_LOCK_DATA_KEY, all_data)
+            store.write_data(store.FILE_GROUP_LOCKS, all_data, "group_locks")
         return
 
     all_data[key] = legacy_entry
     all_data.erase(legacy_key)
-    settings.set_value(SETTINGS_LOCK_DATA_KEY, all_data)
+    store.write_data(store.FILE_GROUP_LOCKS, all_data, "group_locks")
 
 
 func _load_lock_from_settings() -> void:
-    var settings = _get_core_settings()
-    if settings == null:
+    var store = _get_qol_data_store()
+    if store == null:
         return
-    var all_data: Dictionary = settings.get_dict(SETTINGS_LOCK_DATA_KEY, {})
+    var all_data: Dictionary = store.read_data(store.FILE_GROUP_LOCKS, {})
     var key := _get_group_key()
     var entry = all_data.get(key, null)
     if entry is bool:
@@ -595,22 +594,22 @@ func _load_lock_from_settings() -> void:
             locked = legacy_entry
             all_data[key] = legacy_entry
             all_data.erase(legacy_key)
-            settings.set_value(SETTINGS_LOCK_DATA_KEY, all_data)
+            store.write_data(store.FILE_GROUP_LOCKS, all_data, "group_locks")
             return
 
     locked = false
 
 
 func _save_lock_to_settings() -> void:
-    var settings = _get_core_settings()
-    if settings == null:
+    var store = _get_qol_data_store()
+    if store == null:
         return
-    var all_data: Dictionary = settings.get_dict(SETTINGS_LOCK_DATA_KEY, {})
+    var all_data: Dictionary = store.read_data(store.FILE_GROUP_LOCKS, {})
     if locked:
         all_data[_get_group_key()] = true
     else:
         all_data.erase(_get_group_key())
-    settings.set_value(SETTINGS_LOCK_DATA_KEY, all_data)
+    store.write_data(store.FILE_GROUP_LOCKS, all_data, "group_locks")
 
 
 func _is_patterns_enabled() -> bool:
@@ -663,4 +662,11 @@ func _get_core_settings():
         var core = Engine.get_meta("TajsCore")
         if core != null and core.settings != null:
             return core.settings
+    return null
+
+func _get_qol_data_store() -> Variant:
+    if Engine.has_meta("TajsCore"):
+        var core = Engine.get_meta("TajsCore")
+        if core != null and core.has_method("get_extended_global"):
+            return core.get_extended_global("qol_data_store", null)
     return null

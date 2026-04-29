@@ -19,6 +19,7 @@ var _config = null
 var _desktop: Control = null
 var _notes_container: Control = null
 var _mod_main = null
+var _data_store = null
 
 # State
 var _notes: Dictionary = {} # note_id -> TajsStickyNote
@@ -32,9 +33,10 @@ var _bulk_drag_start_positions: Dictionary = {} # note_id -> Vector2
 var _drag_signals_connected: bool = false
 var _drag_signal_connect_attempts: int = 0
 
-func setup(config, _tree: SceneTree, mod_main = null) -> void:
+func setup(config, _tree: SceneTree, mod_main = null, data_store = null) -> void:
     _config = config
     _mod_main = mod_main
+    _data_store = data_store
     call_deferred("_connect_drag_signals_deferred")
 
     # Try to initialize immediately, or defer if not ready
@@ -348,10 +350,8 @@ func _get_undo_manager():
 # PERSISTENCE
 # ==============================================================================
 
-const NOTES_KEY = "tajs_qol.sticky_notes_data"
-
 func save_notes() -> void:
-    if not _config:
+    if _data_store == null:
         _log("Cannot save notes - no config", true)
         return
     var notes_data: Array = []
@@ -359,14 +359,14 @@ func save_notes() -> void:
         var note = _notes[note_id]
         if is_instance_valid(note):
             notes_data.append(note.get_data())
-    _config.set_value(NOTES_KEY, notes_data)
+    _data_store.write_data(_data_store.FILE_STICKY_NOTES, notes_data, "sticky_notes")
     _log("Saved %d notes" % notes_data.size(), true)
 
 func load_notes() -> void:
-    if not _config:
+    if _data_store == null:
         _log("Cannot load notes - no config", true)
         return
-    var notes_data = _config.get_value(NOTES_KEY, [])
+    var notes_data = _data_store.read_data(_data_store.FILE_STICKY_NOTES, [])
     _log("Loading notes, found %d entries" % (notes_data.size() if notes_data is Array else 0), true)
     if not notes_data is Array: notes_data = []
 
