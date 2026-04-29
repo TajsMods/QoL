@@ -6,6 +6,7 @@ const SchematicListRowScript = preload("res://mods-unpacked/TajemnikTV-QoL/exten
 const StatusBadgeScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/schematic_library/ui/status_badge.gd")
 const TagChipScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/schematic_library/ui/tag_chip.gd")
 const ToggleSwitchScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/schematic_library/ui/toggle_switch.gd")
+const IconResolverScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/schematic_library/icon_resolver.gd")
 const IconPickerPopupScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/ui/icon_picker_popup.gd")
 
 const LEGACY_SETTING_KEY := "tajs_qol.schematic_legacy_view"
@@ -23,10 +24,15 @@ var open: bool = false
 var _legacy_container: Control
 var _root_margin: MarginContainer
 var _toolbar_left: HBoxContainer
+var _toolbar_right: HBoxContainer
 var _custom_body: HBoxContainer
 var _legacy_switch
+var _import_button: Button
+var _refresh_button: Button
+var _close_button: Button
 var _search_wrap: PanelContainer
 var _search_input: LineEdit
+var _sort_label: Label
 var _sort_dropdown: OptionButton
 var _result_count: Label
 var _clear_filters_button: Button
@@ -79,6 +85,8 @@ var _meta_cache: Dictionary = {}
 var _library_categories: Array[String] = []
 var _legacy_enabled: bool = false
 var _suppress_detail_events: bool = false
+var _layout_queued: bool = false
+var _refresh_queued: bool = false
 
 
 func _ready() -> void:
@@ -86,8 +94,6 @@ func _ready() -> void:
     _legacy_container = get_node_or_null("MarginContainer")
     if _legacy_container == null:
         _legacy_container = get_node_or_null("SchematicsContainer")
-    if _legacy_container == null:
-        _legacy_container = self
     _metadata_store = MetadataStoreScript.new()
     var core = Engine.get_meta("TajsCore", null)
     if core != null and core.has_method("get"):
@@ -96,7 +102,7 @@ func _ready() -> void:
     _build_ui()
     _sync_legacy_setting()
     _apply_legacy_mode()
-    _apply_layout()
+    _queue_layout()
     _bring_to_front()
     _refresh_library()
 
@@ -113,7 +119,7 @@ func toggle(toggle_on: bool) -> void:
         visible = true
         modulate.a = 1.0
         _bring_to_front()
-        _apply_layout()
+        _queue_layout()
         _refresh_library()
         if not _legacy_enabled:
             call_deferred("_focus_search")
@@ -249,10 +255,10 @@ func _build_toolbar_left(parent: HBoxContainer) -> void:
     search_sort_gap.custom_minimum_size = Vector2(10, 0)
     parent.add_child(search_sort_gap)
 
-    var sort_label := Label.new()
-    sort_label.text = "Sort by:"
-    sort_label.add_theme_font_size_override("font_size", 24)
-    parent.add_child(sort_label)
+    _sort_label = Label.new()
+    _sort_label.text = "Sort by:"
+    _sort_label.add_theme_font_size_override("font_size", 24)
+    parent.add_child(_sort_label)
 
     _sort_dropdown = OptionButton.new()
     for option in SORT_OPTIONS:
@@ -269,36 +275,38 @@ func _build_toolbar_left(parent: HBoxContainer) -> void:
 
 
 func _build_toolbar_right(parent: HBoxContainer) -> void:
-    var right_wrap := HBoxContainer.new()
-    right_wrap.add_theme_constant_override("separation", 8)
-    parent.add_child(right_wrap)
+    _toolbar_right = HBoxContainer.new()
+    _toolbar_right.add_theme_constant_override("separation", 8)
+    _toolbar_right.alignment = BoxContainer.ALIGNMENT_END
+    _toolbar_right.size_flags_horizontal = Control.SIZE_SHRINK_END
+    parent.add_child(_toolbar_right)
 
-    var import_btn := Button.new()
-    import_btn.text = "Import"
-    import_btn.focus_mode = Control.FOCUS_NONE
-    import_btn.custom_minimum_size = Vector2(112, 48)
-    import_btn.add_theme_font_size_override("font_size", 24)
-    import_btn.pressed.connect(_on_import_button_pressed)
-    right_wrap.add_child(import_btn)
+    _import_button = Button.new()
+    _import_button.text = "Import"
+    _import_button.focus_mode = Control.FOCUS_NONE
+    _import_button.custom_minimum_size = Vector2(112, 48)
+    _import_button.add_theme_font_size_override("font_size", 24)
+    _import_button.pressed.connect(_on_import_button_pressed)
+    _toolbar_right.add_child(_import_button)
 
-    var refresh_btn := Button.new()
-    refresh_btn.text = "Refresh"
-    refresh_btn.focus_mode = Control.FOCUS_NONE
-    refresh_btn.custom_minimum_size = Vector2(120, 48)
-    refresh_btn.add_theme_font_size_override("font_size", 24)
-    refresh_btn.pressed.connect(_refresh_library)
-    right_wrap.add_child(refresh_btn)
+    _refresh_button = Button.new()
+    _refresh_button.text = "Refresh"
+    _refresh_button.focus_mode = Control.FOCUS_NONE
+    _refresh_button.custom_minimum_size = Vector2(120, 48)
+    _refresh_button.add_theme_font_size_override("font_size", 24)
+    _refresh_button.pressed.connect(_refresh_library)
+    _toolbar_right.add_child(_refresh_button)
 
     _legacy_switch = ToggleSwitchScript.new("Legacy View", false)
     _legacy_switch.toggled.connect(_on_legacy_toggled)
-    right_wrap.add_child(_legacy_switch)
+    _toolbar_right.add_child(_legacy_switch)
 
-    var close_btn := Button.new()
-    close_btn.text = "X"
-    close_btn.focus_mode = Control.FOCUS_NONE
-    close_btn.custom_minimum_size = Vector2(38, 38)
-    close_btn.pressed.connect(_close_panel)
-    right_wrap.add_child(close_btn)
+    _close_button = Button.new()
+    _close_button.text = "X"
+    _close_button.focus_mode = Control.FOCUS_NONE
+    _close_button.custom_minimum_size = Vector2(38, 38)
+    _close_button.pressed.connect(_close_panel)
+    _toolbar_right.add_child(_close_button)
 
 func _build_filters_column() -> void:
     var panel := PanelContainer.new()
@@ -820,7 +828,17 @@ func _build_category_chip(text: String) -> PanelContainer:
     return chip
 
 func _refresh_library() -> void:
+    if _refresh_queued:
+        return
+    _refresh_queued = true
+    call_deferred("_run_refresh_library")
+
+
+func _run_refresh_library() -> void:
+    _refresh_queued = false
     if _legacy_enabled:
+        return
+    if not open and not visible:
         return
     _reload_categories()
     _rebuild_filter_ui()
@@ -1623,25 +1641,11 @@ func _get_preview_texture(data: Dictionary) -> Texture2D:
 
 
 func _resolve_icon_texture(icon_id: String) -> Texture2D:
-    if icon_id == "":
-        return null
-    var core = Engine.get_meta("TajsCore", null)
-    if core != null:
-        var registry = core.get_icon_registry()
-        if registry != null:
-            var resolved: Dictionary = registry.resolve_icon(icon_id)
-            if resolved.get("texture", null) != null:
-                return resolved.texture
-    if icon_id.find(":") != -1:
-        var parts := icon_id.split(":", false, 1)
-        if parts.size() == 2 and parts[1] != "":
-            var mapped := "res://textures/icons".path_join(parts[1])
-            if ResourceLoader.exists(mapped):
-                return load(mapped)
-    var path := "res://textures/icons/%s.png" % icon_id
-    if ResourceLoader.exists(path):
-        return load(path)
-    return null
+    return IconResolverScript.resolve_icon_texture(icon_id)
+
+
+func _normalize_icon_id(icon_value: String) -> String:
+    return IconResolverScript.normalize_icon_id(icon_value)
 
 
 func _format_short_date(unix_time: int) -> String:
@@ -1667,33 +1671,83 @@ func _clear_children(node: Node) -> void:
 
 
 func _on_viewport_resized() -> void:
-    _apply_layout()
+    _queue_layout()
 
 
-func _apply_layout() -> void:
+func _notification(what: int) -> void:
+    if what == NOTIFICATION_RESIZED:
+        _queue_layout()
+
+
+func _queue_layout() -> void:
+    if _layout_queued:
+        return
+    _layout_queued = true
     call_deferred("_commit_layout")
 
 
 func _commit_layout() -> void:
+    _layout_queued = false
+
     set_anchors_preset(Control.PRESET_FULL_RECT)
-    var viewport_size := get_viewport().get_visible_rect().size
-    var side: float = clamp(viewport_size.x * 0.018, 16.0, 46.0)
-    var top: float = clamp(viewport_size.y * 0.018, 14.0, 34.0)
-    var bottom: float = clamp(viewport_size.y * 0.13, 100.0, 170.0)
+    offset_left = 0.0
+    offset_top = 0.0
+    offset_right = 0.0
+    offset_bottom = 0.0
+
+    if _root_margin != null:
+        _root_margin.offset_left = 0.0
+        _root_margin.offset_top = 0.0
+        _root_margin.offset_right = 0.0
+        _root_margin.offset_bottom = 0.0
+
+    var panel_size := size
+    if panel_size.x <= 1.0 or panel_size.y <= 1.0:
+        var parent_control := get_parent() as Control
+        if parent_control != null:
+            panel_size = parent_control.size
+
+    var compact := panel_size.x < 1400.0 or panel_size.y < 760.0
+    var tight := panel_size.x < 1180.0
+
     if _search_wrap != null:
-        var search_width: float = clamp(viewport_size.x * 0.40, 520.0, 860.0)
-        _search_wrap.custom_minimum_size.x = search_width
-    offset_left = side
-    offset_top = top
-    offset_right = - side
-    offset_bottom = - bottom
+        var min_search_width := 360.0 if compact else 520.0
+        var max_search_width := 760.0 if compact else 980.0
+        _search_wrap.custom_minimum_size.x = clamp(panel_size.x * 0.34, min_search_width, max_search_width)
+
+    if _sort_label != null:
+        _sort_label.visible = not tight
+        _sort_label.add_theme_font_size_override("font_size", 18 if compact else 24)
+
+    if _sort_dropdown != null:
+        _sort_dropdown.custom_minimum_size = Vector2(180, 42) if compact else Vector2(240, 48)
+        _sort_dropdown.add_theme_font_size_override("font_size", 18 if compact else 24)
+
+    if _result_count != null:
+        _result_count.visible = not tight
+        _result_count.add_theme_font_size_override("font_size", 14 if compact else 16)
+
+    if _toolbar_right != null:
+        _toolbar_right.add_theme_constant_override("separation", 6 if compact else 8)
+    if _import_button != null:
+        _import_button.custom_minimum_size = Vector2(94, 40) if compact else Vector2(112, 48)
+        _import_button.add_theme_font_size_override("font_size", 18 if compact else 24)
+    if _refresh_button != null:
+        _refresh_button.custom_minimum_size = Vector2(104, 40) if compact else Vector2(120, 48)
+        _refresh_button.add_theme_font_size_override("font_size", 18 if compact else 24)
+    if _close_button != null:
+        _close_button.custom_minimum_size = Vector2(34, 34) if compact else Vector2(38, 38)
+
+    if _custom_body != null:
+        _custom_body.add_theme_constant_override("separation", 3 if compact else 4)
 
 
 func _bring_to_front() -> void:
-    move_to_front()
     var parent := get_parent()
     if parent != null:
-        parent.move_child(self , parent.get_child_count() - 1)
+        parent.call_deferred("move_child", self, max(0, parent.get_child_count() - 1))
+    else:
+        call_deferred("move_to_front")
     z_index = 200
 
 
@@ -1738,14 +1792,24 @@ func _on_legacy_toggled(value: bool) -> void:
     if _settings != null:
         _settings.set_value(LEGACY_SETTING_KEY, value)
     _apply_legacy_mode()
-    _refresh_library()
+    _queue_layout()
+    if not _legacy_enabled:
+        call_deferred("_refresh_library")
 
 
 func _apply_legacy_mode() -> void:
     if _legacy_container != null:
         _legacy_container.visible = _legacy_enabled
-    _custom_body.visible = not _legacy_enabled
-    _toolbar_left.visible = not _legacy_enabled
+    if _custom_body != null:
+        _custom_body.visible = not _legacy_enabled
+    if _toolbar_left != null:
+        _toolbar_left.visible = not _legacy_enabled
+    if _toolbar_right != null:
+        _toolbar_right.visible = true
+    if _import_button != null:
+        _import_button.visible = not _legacy_enabled
+    if _refresh_button != null:
+        _refresh_button.visible = not _legacy_enabled
 
 
 func _sync_legacy_setting() -> void:
@@ -1762,3 +1826,6 @@ func _on_setting_changed(key: String, value: Variant, _old_value: Variant) -> vo
     if _legacy_switch != null:
         _legacy_switch.set_pressed_no_signal(_legacy_enabled)
     _apply_legacy_mode()
+    _queue_layout()
+    if not _legacy_enabled:
+        call_deferred("_refresh_library")

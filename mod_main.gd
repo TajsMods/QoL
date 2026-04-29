@@ -161,6 +161,8 @@ var _startup_initialized: bool = false
 
 func _init() -> void:
     if _has_global_class("ModLoaderMod"):
+        if FileAccess.file_exists("res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/schematic_container.gd"):
+            _log_warn("Deprecated schematic_container extension file is still present. It is no longer used in current builds.")
         _safe_install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/windows/window_group.gd")
         _safe_install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/windows/window_inventory.gd")
         _safe_install_script_extension("res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/windows/window_bin.gd")
@@ -175,20 +177,10 @@ func _init() -> void:
                 "res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/schematic_button.gd",
                 "res://scenes/schematic_button.gd"
             )
-        else:
-            _safe_install_script_extension(
-                "res://mods-unpacked/TajemnikTV-QoL/extensions/scenes/schematic_container.gd",
-                "res://scenes/schematic_container.gd"
-            )
         if ResourceLoader.exists("res://scripts/schematics_tab.gd"):
             _safe_install_script_extension(
                 "res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/schematics_menu.gd",
                 "res://scripts/schematics_tab.gd"
-            )
-        else:
-            _safe_install_script_extension(
-                "res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/schematics_menu.gd",
-                "res://scripts/schematics_menu.gd"
             )
     _core = _get_core()
     if _core == null:
