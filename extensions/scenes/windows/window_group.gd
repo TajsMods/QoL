@@ -287,10 +287,10 @@ func _ensure_pattern_ui() -> void:
 
 
 func _add_pattern_button() -> void:
-    var title_panel = get_node_or_null("TitlePanel")
-    if title_panel == null:
+    var title_panel_node = get_node_or_null("TitlePanel")
+    if title_panel_node == null:
         return
-    var title_container = title_panel.get_node_or_null("TitleContainer")
+    var title_container = title_panel_node.get_node_or_null("TitleContainer")
     if title_container == null:
         return
     if title_container.has_node("PatternButton"):
@@ -319,13 +319,13 @@ func _add_pattern_button() -> void:
 func _inject_pattern_drawers() -> void:
     if not pattern_drawers.is_empty():
         return
-    var body_panel = get_node_or_null("PanelContainer")
-    if body_panel:
+    var body_panel_node = get_node_or_null("PanelContainer")
+    if body_panel_node:
         var body_drawer = PatternDrawerScript.new()
         body_drawer.set_anchors_preset(Control.PRESET_FULL_RECT)
         body_drawer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-        body_panel.add_child(body_drawer)
-        body_panel.move_child(body_drawer, 0)
+        body_panel_node.add_child(body_drawer)
+        body_panel_node.move_child(body_drawer, 0)
         pattern_drawers.append(body_drawer)
 
 
@@ -341,9 +341,9 @@ func _hide_pattern_ui() -> void:
         _pattern_picker_layer.visible = false
     if _color_picker_layer:
         _color_picker_layer.visible = false
-    var title_panel = get_node_or_null("TitlePanel")
-    if title_panel:
-        var title_container = title_panel.get_node_or_null("TitleContainer")
+    var title_panel_node = get_node_or_null("TitlePanel")
+    if title_panel_node:
+        var title_container = title_panel_node.get_node_or_null("TitleContainer")
         if title_container and title_container.has_node("PatternButton"):
             title_container.get_node("PatternButton").queue_free()
 
@@ -421,7 +421,7 @@ func grab(g: bool) -> void:
     super.grab(g)
 
 
-func _on_move_selection(to: Vector2) -> void:
+func _on_move_selection(_to: Vector2) -> void:
     if locked:
         return
 
