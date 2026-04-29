@@ -602,7 +602,10 @@ func _register_settings() -> void:
             "category": "Shop & Requests"
         },
     }
-    _settings.register_schema(MOD_ID, schema, SETTINGS_PREFIX)
+    if _core != null and _core.has_method("register_settings_schema"):
+        _core.register_settings_schema(MOD_ID, schema, SETTINGS_PREFIX)
+    else:
+        _settings.register_schema(MOD_ID, schema, SETTINGS_PREFIX)
     if existing_wire_drop is String and existing_wire_drop == missing_sentinel and legacy_wire_drop != null:
         _settings.set_value(SETTING_WIRE_DROP_ENABLED, bool(legacy_wire_drop))
 
@@ -646,7 +649,7 @@ func _init_features() -> void:
 
     _screenshot_toolbar = ScreenshotToolbarFeatureScript.new()
     add_child(_screenshot_toolbar)
-    _screenshot_toolbar.setup(_core, Callable(self, "_on_screenshot_full"), Callable(self, "_on_screenshot_selection"))
+    _screenshot_toolbar.setup(_core, Callable(self , "_on_screenshot_full"), Callable(self , "_on_screenshot_selection"))
 
     _wire_colors = WireColorsFeatureScript.new()
     _wire_colors.setup(_core)
@@ -863,7 +866,7 @@ func _register_toolbar_number_keybinds() -> void:
             "Toolbar/Menu Slot %d" % slot,
             [_core.keybinds.make_key_event(keycode)],
             _core.keybinds.CONTEXT_GAMEPLAY,
-            Callable(self, "_on_toolbar_number_slot").bind(slot),
+            Callable(self , "_on_toolbar_number_slot").bind(slot),
             0,
             KEYBIND_CATEGORY_ID
         )
@@ -873,7 +876,7 @@ func _register_toolbar_number_keybinds() -> void:
             "Toolbar/Menu Slot %d (Modifier)" % (slot + 9),
             [_core.keybinds.make_key_event(keycode, false, true)],
             _core.keybinds.CONTEXT_GAMEPLAY,
-            Callable(self, "_on_toolbar_number_slot_modifier").bind(slot),
+            Callable(self , "_on_toolbar_number_slot_modifier").bind(slot),
             0,
             KEYBIND_CATEGORY_ID
         )
