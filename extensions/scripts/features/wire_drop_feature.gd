@@ -13,6 +13,8 @@ var _node_filter
 var _palette_controller
 var _palette_overlay
 var _enabled: bool = true
+var _active_drop_token: int = 0
+var _consumed_drop_token: int = -1
 
 
 func setup(core) -> void:
@@ -60,6 +62,10 @@ func _on_palette_ready(payload: Dictionary) -> void:
 func _on_wire_dropped_on_canvas(origin_info: Dictionary, drop_position: Vector2) -> void:
     if _node_filter == null:
         return
+    _active_drop_token += 1
+    var tagged_origin_info: Dictionary = origin_info.duplicate()
+    tagged_origin_info["_tajs_drop_token"] = _active_drop_token
+
     var origin_shape: String = origin_info.get("connection_shape", "")
     var origin_color: String = origin_info.get("connection_color", "")
     var origin_is_output: bool = origin_info.get("is_output", true)
@@ -70,15 +76,23 @@ func _on_wire_dropped_on_canvas(origin_info: Dictionary, drop_position: Vector2)
         return
 
     if _palette_overlay != null and _palette_overlay.has_method("show_node_picker"):
-        _palette_overlay.show_node_picker(compatible, origin_info, drop_position)
+        _palette_overlay.show_node_picker(compatible, tagged_origin_info, drop_position)
         return
 
-    _spawn_fallback(compatible, origin_info, drop_position)
+    _spawn_fallback(compatible, tagged_origin_info, drop_position)
 
 
 func _on_palette_node_selected(window_id: String, spawn_pos: Vector2, origin_info: Dictionary) -> void:
     if _connector == null:
         return
+    var drop_token: int = int(origin_info.get("_tajs_drop_token", -1))
+    if drop_token == -1:
+        return
+    if drop_token != _active_drop_token:
+        return
+    if drop_token == _consumed_drop_token:
+        return
+    _consumed_drop_token = drop_token
     _connector.spawn_and_connect(window_id, spawn_pos, origin_info)
 
 
