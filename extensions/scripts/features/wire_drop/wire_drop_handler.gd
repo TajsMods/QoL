@@ -12,6 +12,7 @@ var _logger
 # Track connection state - these persist across calls
 var _last_connection_output: String = ""
 var _last_connection_input: String = ""
+var _drop_signal_name: String = ""
 
 func _init() -> void:
     pass
@@ -40,16 +41,26 @@ func _connect_signals() -> void:
             Engine.get_main_loop().process_frame.connect(_connect_signals, CONNECT_ONE_SHOT)
         return
 
-    # Connect to connection_droppped signal (note: game uses double 'p' spelling)
-    if not Signals.connection_droppped.is_connected(_on_connection_dropped):
-        Signals.connection_droppped.connect(_on_connection_dropped)
+    # Compatibility: prefer game's current typo, fallback to corrected spelling.
+    _drop_signal_name = ""
+    for signal_name: String in ["connection_droppped", "connection_dropped"]:
+        if Signals.has_signal(signal_name):
+            var sig: Signal = Signals.get(signal_name)
+            if not sig.is_connected(_on_connection_dropped):
+                sig.connect(_on_connection_dropped)
+            _drop_signal_name = signal_name
+            break
 
     # Listen for create_connection to know when a connection is being created
-    if not Signals.create_connection.is_connected(_on_create_connection):
-        Signals.create_connection.connect(_on_create_connection)
+    if Signals.has_signal("create_connection"):
+        var create_sig: Signal = Signals.get("create_connection")
+        if not create_sig.is_connected(_on_create_connection):
+            create_sig.connect(_on_create_connection)
+    elif _is_debug_enabled():
+        _log_warn("Missing Signals.create_connection; wire drop picker may misfire")
 
     _connected = true
-    _log_info("Wire drop handler connected to signals")
+    _debug_log("Wire drop handler connected (drop_signal=%s)" % _drop_signal_name)
 
 
 func set_enabled(enabled: bool) -> void:

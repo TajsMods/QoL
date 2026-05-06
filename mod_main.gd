@@ -26,6 +26,8 @@ const GroupPatternsFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/e
 const GroupLayerFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/group_layer_feature.gd")
 const UndoRedoFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/undo_redo_feature.gd")
 const GotoToolbarButtonsFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/goto_toolbar_buttons_feature.gd")
+const FindAnythingFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/find_anything_feature.gd")
+const CameraBookmarksFeatureScript = preload("res://mods-unpacked/TajemnikTV-QoL/extensions/scripts/features/camera_bookmarks_feature.gd")
 const GotoGroupManagerScript = preload("res://mods-unpacked/TajemnikTV-Core/core/util/goto_group_manager.gd")
 const CoreColorPickerPanelScript = preload("res://mods-unpacked/TajemnikTV-Core/core/ui/color_picker_panel.gd")
 
@@ -71,6 +73,11 @@ const SETTING_HIDE_PURCHASED_TOKENS := "%s.hide_purchased_tokens" % SETTINGS_PRE
 const SETTING_DELETE_CONFIRM_THRESHOLD := "%s.delete_confirm_threshold" % SETTINGS_PREFIX
 const SETTING_CONTEXT_RADIAL_ENABLED := "%s.context_radial_enabled" % SETTINGS_PREFIX
 const SETTING_SCHEMATIC_LEGACY_VIEW := "%s.schematic_legacy_view" % SETTINGS_PREFIX
+const ACTION_FIND_ANYTHING := "%s.find_anything" % MOD_ID
+const ACTION_BOOKMARKS_PANEL := "%s.bookmarks_panel" % MOD_ID
+const ACTION_BOOKMARKS_SAVE_CURRENT := "%s.bookmarks_save_current" % MOD_ID
+const ACTION_BOOKMARKS_NEXT := "%s.bookmarks_next" % MOD_ID
+const ACTION_BOOKMARKS_PREVIOUS := "%s.bookmarks_previous" % MOD_ID
 
 const SETTINGS_KEYS := [
     SETTING_SMART_SELECT_ENABLED,
@@ -141,6 +148,8 @@ var _group_patterns
 var _group_layer
 var _undo_redo
 var _goto_toolbar_buttons
+var _find_anything
+var _camera_bookmarks
 
 var _hud_ready: bool = false
 var _setting_handlers: Dictionary = {}
@@ -187,7 +196,7 @@ func _init() -> void:
     if not _core.require(CORE_MIN_VERSION):
         _log_warn("Taj's Core %s+ required; QoL disabled." % CORE_MIN_VERSION)
         return
-    _settings = _core.settings
+    _settings = _get_settings_service()
     _register_module()
     _register_settings()
 
@@ -218,13 +227,41 @@ func _get_core():
             return core
     return null
 
+func _get_settings_service() -> Variant:
+    if _core == null:
+        return null
+    if _core.has_method("get_settings_service"):
+        return _core.get_settings_service()
+    return _core.settings
+
+func _get_event_bus() -> Variant:
+    if _core == null:
+        return null
+    if _core.has_method("get_event_bus"):
+        return _core.get_event_bus()
+    return _core.event_bus
+
+func _get_ui_manager() -> Variant:
+    if _core == null:
+        return null
+    if _core.has_method("get_ui_manager"):
+        return _core.get_ui_manager()
+    return _core.ui_manager
+
+func _get_command_registry() -> Variant:
+    if _core == null:
+        return null
+    if _core.has_method("get_command_registry"):
+        return _core.get_command_registry()
+    return _core.commands
+
 
 func _register_module() -> void:
     if _core.has_method("register_module"):
         _core.register_module({
             "id": MOD_ID,
             "name": "QoL",
-            "version": "0.1.0",
+            "version": _get_mod_version(),
             "min_core_version": CORE_MIN_VERSION
         })
 
@@ -604,8 +641,6 @@ func _register_settings() -> void:
     }
     if _core != null and _core.has_method("register_settings_schema"):
         _core.register_settings_schema(MOD_ID, schema, SETTINGS_PREFIX)
-    else:
-        _settings.register_schema(MOD_ID, schema, SETTINGS_PREFIX)
     if existing_wire_drop is String and existing_wire_drop == missing_sentinel and legacy_wire_drop != null:
         _settings.set_value(SETTING_WIRE_DROP_ENABLED, bool(legacy_wire_drop))
 
@@ -688,6 +723,14 @@ func _init_features() -> void:
     if _core != null and _core.has_method("extend_globals"):
         _core.extend_globals("sticky_note_manager", _sticky_note_manager)
 
+    _find_anything = FindAnythingFeatureScript.new()
+    add_child(_find_anything)
+    _find_anything.setup(_core, _sticky_note_manager, _goto_group_manager)
+
+    _camera_bookmarks = CameraBookmarksFeatureScript.new()
+    add_child(_camera_bookmarks)
+    _camera_bookmarks.setup(_core, _settings, _data_store)
+
     _context_radial = ContextRadialFeatureScript.new()
     add_child(_context_radial)
     _context_radial.setup(_core)
@@ -754,10 +797,11 @@ func _apply_setting(key: String, value: Variant) -> void:
 func _register_events() -> void:
     if _settings != null and not _settings.value_changed.is_connected(_on_setting_changed):
         _settings.value_changed.connect(_on_setting_changed)
-    if _core.event_bus != null:
-        _core.event_bus.on("game.hud_ready", Callable(self , "_on_hud_ready"), self , true)
-        _core.event_bus.on("game.desktop_ready", Callable(self , "_on_desktop_ready"), self , true)
-        _core.event_bus.on("command_palette.ready", Callable(self , "_on_palette_ready"), self , true)
+    var event_bus = _get_event_bus()
+    if event_bus != null:
+        event_bus.on("game.hud_ready", Callable(self , "_on_hud_ready"), self , true)
+        event_bus.on("game.desktop_ready", Callable(self , "_on_desktop_ready"), self , true)
+        event_bus.on("command_palette.ready", Callable(self , "_on_palette_ready"), self , true)
     if get_tree() != null and not get_tree().node_added.is_connected(_on_node_added):
         get_tree().node_added.connect(_on_node_added)
     call_deferred("_check_existing_hud")
@@ -795,7 +839,7 @@ func _on_hud_ready(_payload: Dictionary) -> void:
     if _hud_ready:
         return
     _hud_ready = true
-    _ui_manager = _core.ui_manager if _core != null else null
+    _ui_manager = _get_ui_manager()
     if _notification_history != null:
         _notification_history.on_hud_ready()
     if _visual_effects != null:
@@ -805,7 +849,7 @@ func _on_hud_ready(_payload: Dictionary) -> void:
 func _ensure_settings_tab() -> void:
     if _settings_ui_built:
         return
-    if _core == null or _core.ui_manager == null:
+    if _core == null or _get_ui_manager() == null:
         return
     _settings_tab = _core.get_settings_tab(MOD_ID)
     if _settings_tab == null:
@@ -843,6 +887,69 @@ func _register_keybinds() -> void:
         0,
         KEYBIND_CATEGORY_ID
     )
+    var find_event = _core.keybinds.make_key_event(KEY_K, true)
+    _core.keybinds.register_action_scoped(
+        MOD_ID,
+        "find_anything",
+        "Find Anything",
+        [find_event],
+        _core.keybinds.CONTEXT_NO_TEXT,
+        Callable(self , "_on_find_anything"),
+        0,
+        KEYBIND_CATEGORY_ID
+    )
+    _core.keybinds.register_action_scoped(
+        MOD_ID,
+        "camera_bookmarks_panel",
+        "Camera Bookmarks Panel",
+        [_core.keybinds.make_key_event(KEY_B, true)],
+        _core.keybinds.CONTEXT_NO_TEXT,
+        Callable(self , "_on_bookmarks_panel"),
+        0,
+        KEYBIND_CATEGORY_ID
+    )
+    _core.keybinds.register_action_scoped(
+        MOD_ID,
+        "camera_bookmarks_save_current",
+        "Save Camera Bookmark",
+        [_core.keybinds.make_key_event(KEY_B, true, true)],
+        _core.keybinds.CONTEXT_NO_TEXT,
+        Callable(self , "_on_bookmarks_save_current"),
+        0,
+        KEYBIND_CATEGORY_ID
+    )
+    _core.keybinds.register_action_scoped(
+        MOD_ID,
+        "camera_bookmarks_next",
+        "Next Camera Bookmark",
+        [_core.keybinds.make_key_event(KEY_BRACKETRIGHT)],
+        _core.keybinds.CONTEXT_NO_TEXT,
+        Callable(self , "_on_bookmarks_next"),
+        0,
+        KEYBIND_CATEGORY_ID
+    )
+    _core.keybinds.register_action_scoped(
+        MOD_ID,
+        "camera_bookmarks_previous",
+        "Previous Camera Bookmark",
+        [_core.keybinds.make_key_event(KEY_BRACKETLEFT)],
+        _core.keybinds.CONTEXT_NO_TEXT,
+        Callable(self , "_on_bookmarks_previous"),
+        0,
+        KEYBIND_CATEGORY_ID
+    )
+    for slot in range(1, 10):
+        var slot_keycode := _keycode_for_number_slot(slot)
+        _core.keybinds.register_action_scoped(
+            MOD_ID,
+            "camera_bookmark_slot_%d" % slot,
+            "Jump Camera Bookmark Slot %d" % slot,
+            [_core.keybinds.make_key_event(slot_keycode, false, false, true)],
+            _core.keybinds.CONTEXT_NO_TEXT,
+            Callable(self , "_on_bookmarks_slot").bind(slot),
+            0,
+            KEYBIND_CATEGORY_ID
+        )
     var boost_event = _core.keybinds.make_key_event(KEY_SHIFT)
     _core.keybinds.register_action(
         ACTION_CAMERA_BOOST,
@@ -917,7 +1024,7 @@ func _on_toolbar_number_slot_modifier(slot: int) -> void:
 
 
 func _register_commands() -> void:
-    var registry = _core.commands if _core.commands != null else _core.command_registry
+    var registry = _get_command_registry()
     if registry == null or _settings == null:
         return
 
@@ -966,6 +1073,99 @@ func _register_commands() -> void:
         "badge": "SAFE",
         "keep_open": true
     }, Callable(self , "_on_goto_group"))
+
+    if _core != null and _core.has_method("register_action"):
+        _core.register_action(ACTION_FIND_ANYTHING, {
+            "title": "Find Anything",
+            "description": "Search and jump to any board object",
+            "category_path": ["Tools"],
+            "keywords": ["find", "search", "jump", "node", "group", "sticky", "note", "schematic", "disconnected"],
+            "icon_path": "res://textures/icons/search.png",
+            "badge": "SAFE"
+        }, Callable(self , "_on_find_anything"))
+    else:
+        registry.register_command(ACTION_FIND_ANYTHING, {
+            "title": "Find Anything",
+            "description": "Search and jump to any board object",
+            "category_path": ["Tools"],
+            "keywords": ["find", "search", "jump", "node", "group", "sticky", "note", "schematic", "disconnected"],
+            "icon_path": "res://textures/icons/search.png",
+            "badge": "SAFE"
+        }, Callable(self , "_on_find_anything"))
+
+    registry.register_command("tajs_qol.find_anything", {
+        "title": "Find Anything",
+        "description": "Search and jump to any board object",
+        "category_path": ["Tools"],
+        "keywords": ["find", "search", "jump", "node", "group", "sticky", "note", "schematic", "disconnected"],
+        "icon_path": "res://textures/icons/search.png",
+        "badge": "SAFE"
+    }, Callable(self , "_on_find_anything"))
+    if _core != null and _core.has_method("register_action"):
+        _core.register_action(ACTION_BOOKMARKS_PANEL, {
+            "title": "Open Camera Bookmarks Panel",
+            "description": "Open or close the camera bookmarks panel",
+            "category_path": ["Tools"],
+            "keywords": ["camera", "bookmark", "waypoint", "panel"],
+            "icon_path": "res://textures/icons/bookmark.png",
+            "badge": "SAFE"
+        }, Callable(self , "_on_bookmarks_panel"))
+        _core.register_action(ACTION_BOOKMARKS_SAVE_CURRENT, {
+            "title": "Save Current Camera Bookmark",
+            "description": "Save the current camera position and zoom as a bookmark",
+            "category_path": ["Tools"],
+            "keywords": ["camera", "bookmark", "save", "waypoint"],
+            "icon_path": "res://textures/icons/bookmark.png",
+            "badge": "SAFE"
+        }, Callable(self , "_on_bookmarks_save_current"))
+        _core.register_action(ACTION_BOOKMARKS_NEXT, {
+            "title": "Jump To Next Camera Bookmark",
+            "description": "Cycle to the next saved camera bookmark",
+            "category_path": ["Tools"],
+            "keywords": ["camera", "bookmark", "next", "cycle", "waypoint"],
+            "icon_path": "res://textures/icons/crosshair.png",
+            "badge": "SAFE"
+        }, Callable(self , "_on_bookmarks_next"))
+        _core.register_action(ACTION_BOOKMARKS_PREVIOUS, {
+            "title": "Jump To Previous Camera Bookmark",
+            "description": "Cycle to the previous saved camera bookmark",
+            "category_path": ["Tools"],
+            "keywords": ["camera", "bookmark", "previous", "cycle", "waypoint"],
+            "icon_path": "res://textures/icons/crosshair.png",
+            "badge": "SAFE"
+        }, Callable(self , "_on_bookmarks_previous"))
+    registry.register_command("tajs_qol.bookmarks.panel", {
+        "title": "Camera Bookmarks: Toggle Panel",
+        "description": "Open or close the camera bookmarks panel",
+        "category_path": ["Tools"],
+        "keywords": ["camera", "bookmark", "waypoint", "panel"],
+        "icon_path": "res://textures/icons/bookmark.png",
+        "badge": "SAFE"
+    }, Callable(self , "_on_bookmarks_panel"))
+    registry.register_command("tajs_qol.bookmarks.save_current", {
+        "title": "Camera Bookmarks: Save Current",
+        "description": "Save current camera position and zoom as a bookmark",
+        "category_path": ["Tools"],
+        "keywords": ["camera", "bookmark", "save", "waypoint"],
+        "icon_path": "res://textures/icons/bookmark.png",
+        "badge": "SAFE"
+    }, Callable(self , "_on_bookmarks_save_current"))
+    registry.register_command("tajs_qol.bookmarks.next", {
+        "title": "Camera Bookmarks: Next",
+        "description": "Jump to the next saved camera bookmark",
+        "category_path": ["Tools"],
+        "keywords": ["camera", "bookmark", "next", "cycle"],
+        "icon_path": "res://textures/icons/crosshair.png",
+        "badge": "SAFE"
+    }, Callable(self , "_on_bookmarks_next"))
+    registry.register_command("tajs_qol.bookmarks.previous", {
+        "title": "Camera Bookmarks: Previous",
+        "description": "Jump to the previous saved camera bookmark",
+        "category_path": ["Tools"],
+        "keywords": ["camera", "bookmark", "previous", "cycle"],
+        "icon_path": "res://textures/icons/crosshair.png",
+        "badge": "SAFE"
+    }, Callable(self , "_on_bookmarks_previous"))
 
     # Register "Notes" subcategory under "Tools"
     registry.register({
@@ -1284,34 +1484,113 @@ func _on_create_sticky_note(_ctx = null) -> void:
         _sticky_note_manager.create_note_at_camera_center()
 
 func _on_goto_group(_ctx = null) -> void:
-    if _goto_group_manager == null:
-        _notify("exclamation", "Group manager not initialized")
-        return
-    var groups = _goto_group_manager.get_all_groups()
-    if groups.is_empty():
-        _notify("exclamation", "No groups on desktop")
-        return
-    var overlay = _get_palette_overlay()
-    if overlay == null or not overlay.has_method("show_group_picker"):
-        _notify("exclamation", "Command Palette not available")
-        return
-    _connect_palette_signals()
-    overlay.show_group_picker(groups, _goto_group_manager)
+    _open_find_anything_picker("Group")
 
 func _on_goto_note(_ctx = null) -> void:
-    if _sticky_note_manager == null:
-        _notify("exclamation", "Sticky notes not initialized")
-        return
-    var notes = _sticky_note_manager.get_all_notes()
-    if notes.is_empty():
-        _notify("exclamation", "No notes on desktop")
+    _open_find_anything_picker("Sticky Note")
+
+func _build_group_picker_entries(groups: Array) -> Array[Dictionary]:
+    var out: Array[Dictionary] = []
+    for group in groups:
+        if not is_instance_valid(group):
+            continue
+        var title := ""
+        if "custom_name" in group:
+            title = str(group.custom_name).strip_edges()
+        if title == "":
+            if _goto_group_manager != null and _goto_group_manager.has_method("get_group_name"):
+                title = str(_goto_group_manager.get_group_name(group))
+            elif group.has_method("get_window_name"):
+                title = str(group.get_window_name())
+        if title == "":
+            title = "Group"
+        var icon_path := "res://textures/icons/window.png"
+        if _goto_group_manager != null and _goto_group_manager.has_method("get_group_icon_path"):
+            icon_path = str(_goto_group_manager.get_group_icon_path(group))
+        out.append({
+            "item_id": "group:%s" % str(group.name),
+            "group_ref": group,
+            "title": title,
+            "icon_path": icon_path
+        })
+    return out
+
+func _build_note_picker_entries(notes: Array) -> Array[Dictionary]:
+    var out: Array[Dictionary] = []
+    for note in notes:
+        if not is_instance_valid(note):
+            continue
+        var title := str(note.title_text if "title_text" in note else "Note").strip_edges()
+        if title == "":
+            title = "Note"
+        out.append({
+            "item_id": "note:%s" % str(note.note_id if "note_id" in note else note.name),
+            "note_ref": note,
+            "title": title,
+            "body_text": str(note.body_text if "body_text" in note else ""),
+            "icon_path": "res://textures/icons/star.png"
+        })
+    return out
+
+func _on_find_anything(_ctx = null) -> void:
+    _open_find_anything_picker("")
+
+func _open_find_anything_picker(type_filter: String = "") -> void:
+    if _find_anything == null:
+        _notify("exclamation", "Find Anything not initialized")
         return
     var overlay = _get_palette_overlay()
-    if overlay == null or not overlay.has_method("show_note_picker"):
-        _notify("exclamation", "Command Palette not available")
+    if overlay == null or not overlay.has_method("show_jump_picker"):
+        _find_anything.toggle_finder()
         return
     _connect_palette_signals()
-    overlay.show_note_picker(notes, _sticky_note_manager)
+
+    var entries: Array[Dictionary] = _find_anything.build_jump_picker_entries()
+    if not type_filter.is_empty():
+        var filtered: Array[Dictionary] = []
+        for entry: Dictionary in entries:
+            if str(entry.get("type", "")) == type_filter:
+                filtered.append(entry)
+        entries = filtered
+    if entries.is_empty():
+        _notify("exclamation", "No matching items on desktop")
+        return
+
+    var picker_title := "Find Anything"
+    if type_filter == "Group":
+        picker_title = "Go To Group"
+    elif type_filter == "Sticky Note":
+        picker_title = "Go To Note"
+    overlay.show_jump_picker(entries, picker_title)
+
+func _on_bookmarks_panel(_ctx = null) -> void:
+    if _camera_bookmarks == null:
+        _notify("exclamation", "Camera bookmarks not initialized")
+        return
+    _camera_bookmarks.toggle_panel()
+
+func _on_bookmarks_save_current(_ctx = null) -> void:
+    if _camera_bookmarks == null:
+        _notify("exclamation", "Camera bookmarks not initialized")
+        return
+    _camera_bookmarks.save_current_bookmark()
+
+func _on_bookmarks_next(_ctx = null) -> void:
+    if _camera_bookmarks == null:
+        _notify("exclamation", "Camera bookmarks not initialized")
+        return
+    _camera_bookmarks.jump_next()
+
+func _on_bookmarks_previous(_ctx = null) -> void:
+    if _camera_bookmarks == null:
+        _notify("exclamation", "Camera bookmarks not initialized")
+        return
+    _camera_bookmarks.jump_previous()
+
+func _on_bookmarks_slot(slot: int) -> void:
+    if _camera_bookmarks == null:
+        return
+    _camera_bookmarks.jump_to_slot(slot)
 
 func _on_palette_ready(payload: Dictionary) -> void:
     _palette_controller = payload.get("controller", null)
@@ -1339,14 +1618,57 @@ func _connect_palette_signals() -> void:
     if _palette_overlay.has_signal("note_picker_selected"):
         if not _palette_overlay.note_picker_selected.is_connected(_on_palette_note_selected):
             _palette_overlay.note_picker_selected.connect(_on_palette_note_selected)
+    if _palette_overlay.has_signal("jump_picker_selected"):
+        if not _palette_overlay.jump_picker_selected.is_connected(_on_palette_jump_selected):
+            _palette_overlay.jump_picker_selected.connect(_on_palette_jump_selected)
 
-func _on_palette_group_selected(group) -> void:
+func _on_palette_group_selected(selection) -> void:
+    var group = selection
+    var handled := false
+    if selection is Dictionary:
+        group = selection.get("group_ref", null)
+        handled = bool(selection.get("handled", false))
+    if handled:
+        return
+    if _core != null and _core.has_method("board_focus_item") and is_instance_valid(group):
+        var focused: bool = _core.board_focus_item("group:%s" % str(group.name), {"fit": true, "padding": 0.15})
+        if focused:
+            if _core.has_method("play_sound"):
+                _core.play_sound("click2")
+            return
     if _goto_group_manager != null:
         _goto_group_manager.navigate_to_group(group)
 
-func _on_palette_note_selected(note) -> void:
+func _on_palette_note_selected(selection) -> void:
+    var note = selection
+    var handled := false
+    if selection is Dictionary:
+        note = selection.get("note_ref", null)
+        handled = bool(selection.get("handled", false))
+    if handled:
+        if is_instance_valid(note):
+            if Globals != null:
+                Globals.set_selection([], [])
+            if note.has_method("_set_selected"):
+                note._set_selected(true)
+        return
+    if _core != null and _core.has_method("board_focus_item") and is_instance_valid(note):
+        var note_item_id := "note:%s" % str(note.note_id if "note_id" in note else note.name)
+        var focused: bool = _core.board_focus_item(note_item_id, {"fit": false})
+        if focused:
+            if Globals != null:
+                Globals.set_selection([], [])
+            if note.has_method("_set_selected"):
+                note._set_selected(true)
+            if _core.has_method("play_sound"):
+                _core.play_sound("click2")
+            return
     if _sticky_note_manager != null:
         _sticky_note_manager.navigate_to_note(note)
+
+func _on_palette_jump_selected(selection: Dictionary) -> void:
+    if _find_anything != null:
+        _find_anything.jump_to_selection(selection)
 
 func _notify(icon: String, message: String) -> void:
     if _core != null and _core.has_method("notify"):

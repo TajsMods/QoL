@@ -277,7 +277,18 @@ func _ensure_layer_attached(layer: CanvasLayer) -> void:
         return
     if layer.get_parent() != null:
         return
-    tree.root.call_deferred("add_child", layer)
+    call_deferred("_attach_layer_to_root_deferred", layer)
+
+
+func _attach_layer_to_root_deferred(layer: CanvasLayer) -> void:
+    if layer == null:
+        return
+    var tree := get_tree()
+    if tree == null or tree.root == null:
+        return
+    if layer.get_parent() != null:
+        return
+    tree.root.add_child(layer)
 
 
 func _ensure_pattern_ui() -> void:

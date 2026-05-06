@@ -178,14 +178,14 @@ func get_original_color(resource_id: String) -> Color:
 
 
 func get_configurable_wires() -> Dictionary:
-    return CONFIGURABLE_WIRES
+    return _get_merged_configurable_wires()
 
 
 func _capture_original_colors() -> void:
     _original_colors.clear()
     if Data == null or Data.resources == null:
         return
-    for resource_id in CONFIGURABLE_WIRES:
+    for resource_id in _get_merged_configurable_wires():
         if Data.resources.has(resource_id):
             _original_colors[resource_id] = Data.resources[resource_id].color
 
@@ -265,3 +265,36 @@ func _push_undo_command(resource_id: String, before_hex: String, after_hex: Stri
     var cmd = WireColorChangedCommand.new()
     cmd.setup(self, resource_id, before_hex, after_hex)
     undo_manager.push_command(cmd)
+
+func _get_merged_configurable_wires() -> Dictionary:
+    var merged: Dictionary = CONFIGURABLE_WIRES.duplicate(true)
+    if Data == null or Data.resources == null:
+        return merged
+    for resource_id: Variant in Data.resources:
+        var id: String = str(resource_id)
+        if merged.has(id):
+            continue
+        var resource_data: Dictionary = Data.resources.get(resource_id, {})
+        if not _is_connector_resource(resource_data):
+            continue
+        merged[id] = _humanize_id(id)
+    return merged
+
+func _is_connector_resource(resource_data: Dictionary) -> bool:
+    return str(resource_data.get("connection", "")).strip_edges() != ""
+
+func _humanize_id(value: String) -> String:
+    var words: PackedStringArray = value.split("_", false)
+    var out: Array[String] = []
+    for word: String in words:
+        if word.is_empty():
+            continue
+        if word == "ai":
+            out.append("AI")
+        elif word == "gpu":
+            out.append("GPU")
+        elif word == "cpu":
+            out.append("CPU")
+        else:
+            out.append(word.capitalize())
+    return " ".join(out)

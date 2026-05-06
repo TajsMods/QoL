@@ -428,7 +428,17 @@ func select_all_notes() -> int:
 
 func navigate_to_note(note: Control) -> void:
     if not is_instance_valid(note): return
-    Signals.center_camera.emit(note.position + note.size / 2)
+    var focused := false
+    if Engine.has_meta("TajsCore"):
+        var core: Variant = Engine.get_meta("TajsCore")
+        var note_id := str(note.get("note_id"))
+        if note_id == "":
+            note_id = str(note.name)
+        var note_item_id := "note:%s" % note_id
+        if core != null and core.has_method("board_focus_item"):
+            focused = bool(core.board_focus_item(note_item_id, {"fit": false}))
+    if not focused:
+        Signals.center_camera.emit(note.position + note.size / 2)
     Globals.set_selection([], [])
     note._set_selected(true)
 

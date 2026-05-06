@@ -150,12 +150,25 @@ func _is_group_window(node: Node) -> bool:
 
 
 func _log_info(message: String) -> void:
-    if _core != null and _core.logger != null:
-        _core.logger.info(LOG_NAME, message)
+    if _core != null and _core.has_method("logi"):
+        _core.logi("tajs_qol.groups", message)
+    elif _has_global_class("ModLoaderLog"):
+        ModLoaderLog.info(message, LOG_NAME)
+    else:
+        print("%s %s" % [LOG_NAME, message])
 
 
 func _log_warn(message: String) -> void:
-    if _core != null and _core.logger != null:
-        _core.logger.warn(LOG_NAME, message)
+    if _core != null and _core.has_method("logw"):
+        _core.logw("tajs_qol.groups", message)
+    elif _has_global_class("ModLoaderLog"):
+        ModLoaderLog.warning(message, LOG_NAME)
     else:
         push_warning("%s: %s" % [LOG_NAME, message])
+
+
+static func _has_global_class(class_name_str: String) -> bool:
+    for entry in ProjectSettings.get_global_class_list():
+        if entry.get("class", "") == class_name_str:
+            return true
+    return false

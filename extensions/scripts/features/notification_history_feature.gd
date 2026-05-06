@@ -7,7 +7,7 @@ var _core
 var _enabled: bool = true
 var _max_entries: int = 20
 var _panel: Control = null
-var _pending: Array = []
+var _pending: Array[Dictionary] = []
 var _signals_connected: bool = false
 var _retry_count: int = 0
 
@@ -38,10 +38,8 @@ func on_hud_ready() -> void:
         return
     if _core == null or _core.ui_manager == null:
         return
-    # Try to find the extras container, with retry if not ready yet
     var extras_container = _get_extras_container()
     if extras_container == null:
-        # Container not ready yet, retry after a frame
         if _retry_count < 10:
             _retry_count += 1
             if Engine.get_main_loop():
@@ -56,21 +54,22 @@ func _on_retry_hud_ready() -> void:
 
 func _setup_panel(extras_container: Node) -> void:
     _panel = NotificationLogPanelScript.new()
+    if _panel.has_method("setup"):
+        _panel.call("setup", _core)
     _panel.call("set_max_notifications", _max_entries)
     _panel.visible = _enabled
-    # Add to ExtrasButtons container (same as Puzzle/Core button) so they appear side by side
     if extras_container != null:
         extras_container.add_child(_panel)
-        # Move to position 1 (after the Puzzle button at index 0)
         extras_container.move_child(_panel, 1)
     else:
-        # Fallback to HUD zone if container not found after all retries
-        # Use integer value 1 (TOP_RIGHT) instead of TajsCoreHudInjector.HudZone.TOP_RIGHT
-        # to avoid issues with global class availability in shipped builds
         _core.ui_manager.inject_hud_widget(1, _panel, 10)
+
     if not _pending.is_empty():
         for entry in _pending:
-            _panel.call("add_notification", entry.get("icon", ""), entry.get("text", ""))
+            if bool(entry.get("rich", false)):
+                _panel.call("add_notification_entry", entry.get("entry", {}))
+            else:
+                _panel.call("add_notification", str(entry.get("icon", "")), str(entry.get("text", "")))
         _pending.clear()
 
 
@@ -82,6 +81,15 @@ func open_panel() -> void:
 func clear_panel() -> void:
     if _panel and _panel.has_method("clear_notifications"):
         _panel.call("clear_notifications")
+
+
+func add_actionable_notification(entry: Dictionary) -> int:
+    if not _enabled:
+        return -1
+    if _panel and _panel.has_method("add_notification_entry"):
+        return int(_panel.call("add_notification_entry", entry))
+    _pending.append({"rich": true, "entry": entry.duplicate(true)})
+    return -1
 
 
 func _connect_notifications() -> void:
@@ -102,7 +110,7 @@ func _on_notification(icon: String, text: String) -> void:
     if _panel:
         _panel.call("add_notification", icon, text)
     else:
-        _pending.append({"icon": icon, "text": text})
+        _pending.append({"rich": false, "icon": icon, "text": text})
 
 
 func _get_extras_container() -> Node:

@@ -29,6 +29,13 @@ func set_screenshot_folder(path: String) -> void:
     screenshot_folder = path
 
 
+static func _has_global_class(class_name_str: String) -> bool:
+    for entry in ProjectSettings.get_global_class_list():
+        if entry.get("class", "") == class_name_str:
+            return true
+    return false
+
+
 func set_watermark_enabled(enabled: bool) -> void:
     watermark_enabled = enabled
 
@@ -58,22 +65,25 @@ func take_screenshot() -> void:
         _log("ERROR: Desktop not found", true)
         _notify("exclamation", "Could not capture - desktop not found")
         return
-    var windows_container = desktop.get_node_or_null("Windows")
-    if windows_container == null:
-        _log("ERROR: Windows container not found", true)
-        _notify("exclamation", "Could not capture - no windows")
-        return
-    var bounds = Rect2()
-    var first = true
-    for child in windows_container.get_children():
-        if child is Control:
-            var child_rect = Rect2(child.position, child.size)
-            if first:
-                bounds = child_rect
-                first = false
-            else:
-                bounds = bounds.merge(child_rect)
-    if first:
+    var bounds := Rect2()
+    if _core != null and _core.has_method("board_get_bounds"):
+        bounds = _core.board_get_bounds({"types": ["node", "window", "group"]})
+    else:
+        var windows_container = desktop.get_node_or_null("Windows")
+        if windows_container == null:
+            _log("ERROR: Windows container not found", true)
+            _notify("exclamation", "Could not capture - no windows")
+            return
+        var first = true
+        for child in windows_container.get_children():
+            if child is Control:
+                var child_rect = Rect2(child.position, child.size)
+                if first:
+                    bounds = child_rect
+                    first = false
+                else:
+                    bounds = bounds.merge(child_rect)
+    if bounds.size == Vector2.ZERO:
         _log("No windows to capture", true)
         _notify("exclamation", "No windows to capture")
         return
@@ -341,12 +351,16 @@ func _notify(icon: String, message: String) -> void:
 
 
 func _log(message: String, is_error: bool = false) -> void:
-    if _core != null and _core.logger != null:
+    var module_id := "tajs_qol.screenshot"
+    if _core != null and _core.has_method("logi" if not is_error else "logw"):
         if is_error:
-            _core.logger.warn("qol_screenshot", message)
+            _core.loge(module_id, message)
         else:
-            _core.logger.info("qol_screenshot", message)
-    elif is_error:
-        ModLoaderLog.warning(message, LOG_NAME)
+            _core.logi(module_id, message)
+    elif _has_global_class("ModLoaderLog"):
+        if is_error:
+            ModLoaderLog.warning(message, LOG_NAME)
+        else:
+            ModLoaderLog.info(message, LOG_NAME)
     else:
-        ModLoaderLog.info(message, LOG_NAME)
+        print("%s %s" % [LOG_NAME, message])

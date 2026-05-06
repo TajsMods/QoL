@@ -274,7 +274,7 @@ func _run_command(command_id: String) -> void:
             if _core.run_command(command_id):
                 _play_sound("click2")
                 return
-        var registry = _core.commands if _core.commands != null else _core.command_registry
+        var registry = _core.commands
         if registry != null and registry.has_method("execute"):
             registry.execute(command_id)
             _play_sound("click2")
