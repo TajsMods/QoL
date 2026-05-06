@@ -62,10 +62,7 @@ func _process(delta: float) -> void:
 
     if new_distance != distance_level:
         distance_level = new_distance
-        if Globals.desktop != null and Globals.desktop.is_node_ready():
-            var lines_node: Variant = Globals.desktop.get("lines")
-            if lines_node != null and is_instance_valid(lines_node):
-                Signals.distance_level_set.emit(distance_level)
+        Signals.distance_level_set.emit(distance_level)
 
     Globals.camera_center = get_screen_center_position()
     Globals.camera_zoom = zoom
