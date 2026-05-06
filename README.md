@@ -19,6 +19,7 @@ Quality-of-life utilities for Upload Labs.
 - Camera Bookmarks / Workspace Waypoints (named camera position + zoom bookmarks with jump/cycle/quick slots)
 - Smart Screenshots (full board + selection capture, tiled/HQ)
 - Visual tweaks: wire colors, disconnected node highlight, extra glow/bloom, UI opacity, group patterns/colors, custom boot screen
+- Detached Schematics Browser window (viewport-safe modal for the new browser UI, with legacy browser fallback in the in-menu tab)
 
 ## Find Anything
 

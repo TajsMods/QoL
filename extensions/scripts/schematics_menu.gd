@@ -16,13 +16,20 @@ const STATUS_OPTIONS := ["WIP", "OK", "Meme", "Meta"]
 const SORT_OPTIONS := ["Name (A-Z)", "Name (Z-A)", "Modified (Newest)", "Node Count (High)"]
 const UNCATEGORIZED := "Uncategorized"
 const ALL_CATEGORIES := "All"
+const ROOT_MARGIN_WIDE := 14
+const ROOT_MARGIN_COMPACT := 8
 
 var _metadata_store
 var _settings
+var _core
+var _ui_manager
+var _modal_host
 var open: bool = false
 
 var _legacy_container: Control
+var _legacy_details_panel: Control
 var _root_margin: MarginContainer
+var _root_content: VBoxContainer
 var _toolbar_left: HBoxContainer
 var _toolbar_right: HBoxContainer
 var _custom_body: HBoxContainer
@@ -48,6 +55,10 @@ var _tags_add_prompt_button: Button
 var _list_rows: VBoxContainer
 var _list_rows_scroll: ScrollContainer
 var _row_nodes: Dictionary = {}
+var _filters_panel: PanelContainer
+var _details_panel: PanelContainer
+var _filters_scroll: ScrollContainer
+var _details_scroll: ScrollContainer
 
 var _detail_name: Label
 var _detail_badge
@@ -87,17 +98,23 @@ var _legacy_enabled: bool = false
 var _suppress_detail_events: bool = false
 var _layout_queued: bool = false
 var _refresh_queued: bool = false
+var _last_load_report: Dictionary = {}
+var _detached_modal: Control
+var _detached_content_host: Control
+var _suppress_visibility_route: bool = false
 
 
 func _ready() -> void:
     super._ready()
-    _legacy_container = get_node_or_null("MarginContainer")
-    if _legacy_container == null:
-        _legacy_container = get_node_or_null("SchematicsContainer")
+    _legacy_container = get_node_or_null("SchematicsContainer")
+    _legacy_details_panel = get_node_or_null("SchematicPanel")
     _metadata_store = MetadataStoreScript.new()
-    var core = Engine.get_meta("TajsCore", null)
-    if core != null and core.has_method("get"):
-        _settings = core.get("settings")
+    _core = Engine.get_meta("TajsCore", null)
+    if _core != null and _core.has_method("get"):
+        _settings = _core.get("settings")
+    if _core != null:
+        _ui_manager = _core.ui_manager
+        _modal_host = _resolve_modal_host()
 
     _build_ui()
     _sync_legacy_setting()
@@ -105,6 +122,8 @@ func _ready() -> void:
     _queue_layout()
     _bring_to_front()
     _refresh_library()
+    if not visibility_changed.is_connected(_on_visibility_changed):
+        visibility_changed.connect(_on_visibility_changed)
 
     var viewport := get_viewport()
     if viewport != null and not viewport.size_changed.is_connected(_on_viewport_resized):
@@ -112,10 +131,24 @@ func _ready() -> void:
     if _settings != null and _settings.has_signal("value_changed") and not _settings.value_changed.is_connected(_on_setting_changed):
         _settings.value_changed.connect(_on_setting_changed)
 
+func _exit_tree() -> void:
+    _close_detached_browser()
+
 
 func toggle(toggle_on: bool) -> void:
+    _log_route("toggle_called:%s" % str(toggle_on))
     open = toggle_on
     if toggle_on:
+        _sync_legacy_setting()
+        _log_route("post_sync legacy=%s settings=%s" % [str(_legacy_enabled), str(_settings != null)])
+        if not _legacy_enabled:
+            _log_route("attempt_detached_open")
+            var detached_opened := _open_detached_browser()
+            if detached_opened:
+                _log_route("detached_opened_closing_windows_menu")
+                Signals.set_menu.emit(Utils.menu_types.NONE, 0)
+                return
+            _log_route("detached_failed_fallback_in_menu")
         visible = true
         modulate.a = 1.0
         _bring_to_front()
@@ -125,6 +158,27 @@ func toggle(toggle_on: bool) -> void:
             call_deferred("_focus_search")
     else:
         visible = false
+        _close_detached_browser()
+
+func _on_visibility_changed() -> void:
+    if _suppress_visibility_route:
+        return
+    if visible:
+        _log_route("visibility_open_route")
+        open = true
+        _sync_legacy_setting()
+        if not _legacy_enabled:
+            var detached_opened := _open_detached_browser()
+            if detached_opened:
+                Signals.set_menu.emit(Utils.menu_types.NONE, 0)
+                return
+        _queue_layout()
+        _refresh_library()
+        if not _legacy_enabled:
+            call_deferred("_focus_search")
+    else:
+        _log_route("visibility_closed")
+        open = false
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -182,15 +236,15 @@ func _build_ui() -> void:
     _root_margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     add_child(_root_margin)
 
-    var root := VBoxContainer.new()
-    root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    root.size_flags_vertical = Control.SIZE_EXPAND_FILL
-    root.add_theme_constant_override("separation", 10)
-    _root_margin.add_child(root)
+    _root_content = VBoxContainer.new()
+    _root_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    _root_content.size_flags_vertical = Control.SIZE_EXPAND_FILL
+    _root_content.add_theme_constant_override("separation", 10)
+    _root_margin.add_child(_root_content)
 
     var toolbar_panel := PanelContainer.new()
     _apply_panel_style(toolbar_panel)
-    root.add_child(toolbar_panel)
+    _root_content.add_child(toolbar_panel)
 
     var toolbar := HBoxContainer.new()
     toolbar.add_theme_constant_override("separation", 8)
@@ -208,7 +262,7 @@ func _build_ui() -> void:
     _custom_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     _custom_body.size_flags_vertical = Control.SIZE_EXPAND_FILL
     _custom_body.add_theme_constant_override("separation", 4)
-    root.add_child(_custom_body)
+    _root_content.add_child(_custom_body)
 
     _build_filters_column()
     _build_library_column()
@@ -309,16 +363,23 @@ func _build_toolbar_right(parent: HBoxContainer) -> void:
     _toolbar_right.add_child(_close_button)
 
 func _build_filters_column() -> void:
-    var panel := PanelContainer.new()
-    panel.custom_minimum_size = Vector2(300, 0)
-    panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-    _apply_panel_style(panel)
-    _custom_body.add_child(panel)
+    _filters_panel = PanelContainer.new()
+    _filters_panel.custom_minimum_size = Vector2(300, 0)
+    _filters_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+    _apply_panel_style(_filters_panel)
+    _custom_body.add_child(_filters_panel)
+
+    _filters_scroll = ScrollContainer.new()
+    _filters_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+    _filters_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    _filters_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+    _filters_panel.add_child(_filters_scroll)
 
     var box := VBoxContainer.new()
+    box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     box.size_flags_vertical = Control.SIZE_EXPAND_FILL
     box.add_theme_constant_override("separation", 8)
-    panel.add_child(box)
+    _filters_scroll.add_child(box)
 
     var filters_head := HBoxContainer.new()
     filters_head.add_theme_constant_override("separation", 8)
@@ -426,7 +487,7 @@ func _build_filters_column() -> void:
     box.add_child(_tags_add_prompt_button)
 
     var filler := Control.new()
-    filler.size_flags_vertical = Control.SIZE_EXPAND_FILL
+    filler.custom_minimum_size = Vector2(0, 4)
     box.add_child(filler)
 
 
@@ -479,33 +540,34 @@ func _build_library_column() -> void:
 
     _list_rows = VBoxContainer.new()
     _list_rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    _list_rows.size_flags_vertical = Control.SIZE_EXPAND_FILL
     _list_rows.add_theme_constant_override("separation", 6)
     _list_rows_scroll.add_child(_list_rows)
 
 
 func _build_details_column() -> void:
-    var panel := PanelContainer.new()
-    panel.custom_minimum_size = Vector2(420, 0)
-    panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-    _apply_panel_style(panel)
-    _custom_body.add_child(panel)
+    _details_panel = PanelContainer.new()
+    _details_panel.custom_minimum_size = Vector2(420, 0)
+    _details_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+    _apply_panel_style(_details_panel)
+    _custom_body.add_child(_details_panel)
 
     var panel_root := VBoxContainer.new()
     panel_root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     panel_root.size_flags_vertical = Control.SIZE_EXPAND_FILL
     panel_root.add_theme_constant_override("separation", 8)
-    panel.add_child(panel_root)
+    _details_panel.add_child(panel_root)
 
-    var scroll := ScrollContainer.new()
-    scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-    scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-    panel_root.add_child(scroll)
+    _details_scroll = ScrollContainer.new()
+    _details_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+    _details_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    _details_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+    panel_root.add_child(_details_scroll)
 
     var box := VBoxContainer.new()
     box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     box.add_theme_constant_override("separation", 6)
-    scroll.add_child(box)
+    _details_scroll.add_child(box)
 
     # Category chips at the very top (like in the mock)
     _detail_category_chips = HFlowContainer.new()
@@ -836,6 +898,8 @@ func _refresh_library() -> void:
 
 func _run_refresh_library() -> void:
     _refresh_queued = false
+    _last_load_report = _get_schematic_load_report()
+    _apply_legacy_load_state(_last_load_report)
     if _legacy_enabled:
         return
     if not open and not visible:
@@ -858,6 +922,7 @@ func _run_refresh_library() -> void:
             _select_schematic(_visible_names[0])
         else:
             _update_details("")
+    _apply_empty_or_error_state(_last_load_report)
 
 
 func _reload_categories() -> void:
@@ -1088,7 +1153,8 @@ func _update_details(schematic_name: String) -> void:
             _detail_preview.texture = load(DEFAULT_ICON_PATH)
         _detail_stats.text = "Nodes: 0 | Resources: 0 | Links: 0"
         _detail_types.text = "Top Types: -"
-        _detail_warning.visible = false
+        _detail_warning.text = _build_load_state_warning(_last_load_report)
+        _detail_warning.visible = _detail_warning.text != ""
         _detail_desc.text = ""
         _detail_notes.text = ""
         _detail_status.select(0)
@@ -1109,6 +1175,8 @@ func _update_details(schematic_name: String) -> void:
     _detail_stats.text = "Nodes: %d | Resources: %d | Links: %d" % [int(stats.get("node_count", 0)), int(stats.get("resource_count", 0)), int(stats.get("link_count", 0))]
     _detail_types.text = "Top Types: %s" % [", ".join(stats.get("top_types", [])) if not stats.get("top_types", []).is_empty() else "-"]
     _detail_warning.text = "\n".join(preflight.get("warnings", []))
+    if _detail_warning.text == "":
+        _detail_warning.text = _build_load_state_warning(_last_load_report)
     _detail_warning.visible = _detail_warning.text != ""
     _detail_desc.text = str(meta.get("description", ""))
     _detail_notes.text = str(meta.get("notes", ""))
@@ -1614,13 +1682,13 @@ func _get_top_types(counts: Dictionary, limit: int) -> Array[String]:
 
 
 func _compute_preflight(_name: String, stats: Dictionary) -> Dictionary:
-    var required := int(stats.get("node_count", 0))
+    var required_nodes := int(stats.get("node_count", 0))
     var limit := _get_node_limit()
     var available := limit - Globals.max_window_count if limit >= 0 else -1
-    var blocked := limit >= 0 and required > available
+    var blocked := limit >= 0 and required_nodes > available
     var warnings: Array[String] = []
     if blocked:
-        warnings.append("Node limit exceeded: %d needed, %d available" % [required, available])
+        warnings.append("Node limit exceeded: %d needed, %d available" % [required_nodes, available])
     var type_counts: Dictionary = stats.get("type_counts", {})
     for wt in type_counts.keys():
         if Data.windows.has(wt):
@@ -1695,25 +1763,35 @@ func _commit_layout() -> void:
     offset_right = 0.0
     offset_bottom = 0.0
 
+    var panel_size := size
+    var parent_control := get_parent() as Control
+    if parent_control != null and parent_control.size.x > 1.0 and parent_control.size.y > 1.0:
+        panel_size = parent_control.size
+    elif panel_size.x <= 1.0 or panel_size.y <= 1.0:
+        var viewport := get_viewport()
+        if viewport != null:
+            panel_size = viewport.get_visible_rect().size
+
+    var compact := panel_size.x < 1400.0 or panel_size.y < 760.0
+    var tight := panel_size.x < 1180.0
+    var edge_margin := ROOT_MARGIN_COMPACT if compact else ROOT_MARGIN_WIDE
+
     if _root_margin != null:
+        _root_margin.add_theme_constant_override("margin_left", edge_margin)
+        _root_margin.add_theme_constant_override("margin_top", edge_margin)
+        _root_margin.add_theme_constant_override("margin_right", edge_margin)
+        _root_margin.add_theme_constant_override("margin_bottom", edge_margin)
         _root_margin.offset_left = 0.0
         _root_margin.offset_top = 0.0
         _root_margin.offset_right = 0.0
         _root_margin.offset_bottom = 0.0
 
-    var panel_size := size
-    if panel_size.x <= 1.0 or panel_size.y <= 1.0:
-        var parent_control := get_parent() as Control
-        if parent_control != null:
-            panel_size = parent_control.size
-
-    var compact := panel_size.x < 1400.0 or panel_size.y < 760.0
-    var tight := panel_size.x < 1180.0
-
     if _search_wrap != null:
-        var min_search_width := 360.0 if compact else 520.0
+        var min_search_width := 260.0 if compact else 420.0
         var max_search_width := 760.0 if compact else 980.0
         _search_wrap.custom_minimum_size.x = clamp(panel_size.x * 0.34, min_search_width, max_search_width)
+    if _search_input != null:
+        _search_input.custom_minimum_size = Vector2(220, 42) if compact else Vector2(320, 48)
 
     if _sort_label != null:
         _sort_label.visible = not tight
@@ -1740,6 +1818,26 @@ func _commit_layout() -> void:
 
     if _custom_body != null:
         _custom_body.add_theme_constant_override("separation", 3 if compact else 4)
+    if _filters_panel != null:
+        _filters_panel.custom_minimum_size.x = 210 if tight else (240 if compact else 300)
+    if _details_panel != null:
+        _details_panel.custom_minimum_size.x = 290 if tight else (340 if compact else 420)
+    if _category_list != null:
+        _category_list.custom_minimum_size.y = 160 if compact else 272
+    if _detail_desc != null:
+        _detail_desc.custom_minimum_size.y = 100 if compact else 140
+    if _detail_notes != null:
+        _detail_notes.custom_minimum_size.y = 100 if compact else 140
+    if _toolbar_left != null:
+        _toolbar_left.add_theme_constant_override("separation", 6 if compact else 8)
+    if _root_content != null:
+        _root_content.add_theme_constant_override("separation", 8 if compact else 10)
+    if _legacy_container != null:
+        _legacy_container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+        _legacy_container.offset_left = 0.0
+        _legacy_container.offset_top = 0.0
+        _legacy_container.offset_right = 0.0
+        _legacy_container.offset_bottom = 0.0
 
 
 func _bring_to_front() -> void:
@@ -1752,8 +1850,152 @@ func _bring_to_front() -> void:
 
 
 func _close_panel() -> void:
+    if _detached_modal != null and is_instance_valid(_detached_modal):
+        _close_detached_browser()
+        return
     toggle(false)
     Signals.set_menu.emit(Utils.menu_types.NONE, 0)
+
+func _open_detached_browser() -> bool:
+    if _detached_modal != null and is_instance_valid(_detached_modal):
+        return true
+    _ui_manager = _resolve_ui_manager()
+    _modal_host = _resolve_modal_host()
+    if _modal_host == null or not _modal_host.has_method("show_custom_modal"):
+        _log_detached_state("modal_host_unavailable")
+        if Signals != null and Signals.has_signal("notify"):
+            Signals.notify.emit("exclamation", "Detached browser unavailable: Core UI manager modal host not ready.")
+        visible = true
+        _bring_to_front()
+        _queue_layout()
+        _refresh_library()
+        return false
+
+    _detach_custom_ui_for_modal()
+    var config := {
+        "theme": "ShadowPanelContainer",
+        "margin": 8.0,
+        "preferred_size_ratio": Vector2(0.96, 0.94),
+        "min_size": Vector2(1080, 680),
+        "max_size": Vector2(1760, 1200),
+        "content_margin_x": 0,
+        "content_margin_y": 0,
+        "close_on_escape": true,
+        "close_on_backdrop": false,
+        "on_closed": Callable(self, "_on_detached_modal_closed")
+    }
+    var modal_actions: Array[Dictionary] = []
+    _detached_modal = _modal_host.show_custom_modal(config, _detached_content_host, modal_actions)
+    if _detached_modal == null:
+        _log_detached_state("modal_returned_null")
+        _reattach_custom_ui_from_modal()
+        visible = true
+        _bring_to_front()
+        _queue_layout()
+        _refresh_library()
+        return false
+    open = true
+    _suppress_visibility_route = true
+    visible = false
+    _suppress_visibility_route = false
+    _queue_layout()
+    _refresh_library()
+    if not _legacy_enabled:
+        call_deferred("_focus_search")
+    return true
+
+func _resolve_ui_manager() -> Variant:
+    if _ui_manager != null and is_instance_valid(_ui_manager):
+        return _ui_manager
+    if _core != null:
+        if _core.has_method("get_ui_manager"):
+            var resolved: Variant = _core.get_ui_manager()
+            if resolved != null and is_instance_valid(resolved):
+                return resolved
+        var prop = _core.ui_manager
+        if prop != null and is_instance_valid(prop):
+            return prop
+    var tree := get_tree()
+    if tree != null and tree.root != null:
+        var node := tree.root.find_child("CoreUiManager", true, false)
+        if node != null and node.has_method("show_custom_modal"):
+            return node
+    return null
+
+func _resolve_modal_host() -> Variant:
+    var manager := _resolve_ui_manager()
+    if manager != null and manager.has_method("show_custom_modal"):
+        return manager
+    if manager != null and manager.has_method("get_children"):
+        for child in manager.get_children():
+            if child != null and child.has_method("show_custom_modal") and str(child.name) == "CorePopupManager":
+                return child
+    var tree := get_tree()
+    if tree != null and tree.root != null:
+        var popup_node := tree.root.find_child("CorePopupManager", true, false)
+        if popup_node != null and popup_node.has_method("show_custom_modal"):
+            return popup_node
+    return null
+
+func _close_detached_browser() -> void:
+    if _detached_modal == null:
+        return
+    _modal_host = _resolve_modal_host()
+    if is_instance_valid(_detached_modal) and _modal_host != null and _modal_host.has_method("close_custom_modal"):
+        _modal_host.close_custom_modal(_detached_modal)
+    else:
+        _on_detached_modal_closed()
+
+func _log_detached_state(reason: String) -> void:
+    var manager_ok := _ui_manager != null and is_instance_valid(_ui_manager)
+    var host_ok := _modal_host != null and is_instance_valid(_modal_host)
+    var message := "Detached schematics fallback (%s). ui_manager=%s modal_host=%s legacy=%s open=%s visible=%s" % [reason, str(manager_ok), str(host_ok), str(_legacy_enabled), str(open), str(visible)]
+    if ModLoaderLog != null:
+        ModLoaderLog.warning(message, "TajemnikTV-QoL:SchematicsMenu")
+    else:
+        print(message)
+
+func _detach_custom_ui_for_modal() -> void:
+    if _root_margin == null:
+        return
+    var current_parent := _root_margin.get_parent()
+    if current_parent != null:
+        current_parent.remove_child(_root_margin)
+    _detached_content_host = Control.new()
+    _detached_content_host.name = "SchematicsDetachedRoot"
+    _detached_content_host.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    _detached_content_host.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    _detached_content_host.size_flags_vertical = Control.SIZE_EXPAND_FILL
+    _detached_content_host.add_child(_root_margin)
+    _root_margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    _root_margin.offset_left = 0.0
+    _root_margin.offset_top = 0.0
+    _root_margin.offset_right = 0.0
+    _root_margin.offset_bottom = 0.0
+
+func _on_detached_modal_closed() -> void:
+    _detached_modal = null
+    _reattach_custom_ui_from_modal()
+    open = false
+    _suppress_visibility_route = true
+    visible = false
+    _suppress_visibility_route = false
+
+func _reattach_custom_ui_from_modal() -> void:
+    if _root_margin == null:
+        return
+    var current_parent := _root_margin.get_parent()
+    if current_parent != null:
+        current_parent.remove_child(_root_margin)
+    add_child(_root_margin)
+    _root_margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    _root_margin.offset_left = 0.0
+    _root_margin.offset_top = 0.0
+    _root_margin.offset_right = 0.0
+    _root_margin.offset_bottom = 0.0
+    if _detached_content_host != null and is_instance_valid(_detached_content_host):
+        _detached_content_host.queue_free()
+    _detached_content_host = null
 
 
 func _focus_search() -> void:
@@ -1777,6 +2019,8 @@ func _on_sort_changed(_idx: int) -> void:
 
 func _on_import_button_pressed() -> void:
     super._on_import_pressed()
+    _last_load_report = _get_schematic_load_report()
+    _apply_legacy_load_state(_last_load_report)
     call_deferred("_refresh_library")
 
 
@@ -1794,12 +2038,25 @@ func _on_legacy_toggled(value: bool) -> void:
     _apply_legacy_mode()
     _queue_layout()
     if not _legacy_enabled:
+        if visible and _detached_modal == null:
+            var detached_opened := _open_detached_browser()
+            if detached_opened:
+                Signals.set_menu.emit(Utils.menu_types.NONE, 0)
+                return
         call_deferred("_refresh_library")
 
 
 func _apply_legacy_mode() -> void:
+    if _legacy_enabled and _detached_modal != null and is_instance_valid(_detached_modal):
+        _close_detached_browser()
     if _legacy_container != null:
         _legacy_container.visible = _legacy_enabled
+        _legacy_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        _legacy_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
+    if _legacy_details_panel != null:
+        _legacy_details_panel.visible = _legacy_enabled
+        _legacy_details_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        _legacy_details_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
     if _custom_body != null:
         _custom_body.visible = not _legacy_enabled
     if _toolbar_left != null:
@@ -1810,13 +2067,30 @@ func _apply_legacy_mode() -> void:
         _import_button.visible = not _legacy_enabled
     if _refresh_button != null:
         _refresh_button.visible = not _legacy_enabled
+    _apply_legacy_load_state(_last_load_report)
 
 
 func _sync_legacy_setting() -> void:
+    _legacy_enabled = false
     if _settings != null:
         _legacy_enabled = _settings.get_bool(LEGACY_SETTING_KEY, false)
+    elif _legacy_switch != null:
+        _legacy_enabled = bool(_legacy_switch.get("button_pressed"))
     if _legacy_switch != null:
         _legacy_switch.set_pressed_no_signal(_legacy_enabled)
+
+func _log_route(message: String) -> void:
+    var text := "Schematics route: %s" % message
+    if _has_global_class("ModLoaderLog"):
+        ModLoaderLog.info(text, "TajemnikTV-QoL:SchematicsMenu")
+    else:
+        print(text)
+
+func _has_global_class(class_name_str: String) -> bool:
+    for entry: Variant in ProjectSettings.get_global_class_list():
+        if entry.get("class", "") == class_name_str:
+            return true
+    return false
 
 
 func _on_setting_changed(key: String, value: Variant, _old_value: Variant) -> void:
@@ -1828,4 +2102,62 @@ func _on_setting_changed(key: String, value: Variant, _old_value: Variant) -> vo
     _apply_legacy_mode()
     _queue_layout()
     if not _legacy_enabled:
+        if visible and _detached_modal == null:
+            var detached_opened := _open_detached_browser()
+            if detached_opened:
+                Signals.set_menu.emit(Utils.menu_types.NONE, 0)
+                return
         call_deferred("_refresh_library")
+
+
+func _get_schematic_load_report() -> Dictionary:
+    if Data != null and Data.has_method("get_schematic_load_report"):
+        var report: Variant = Data.call("get_schematic_load_report")
+        if report is Dictionary:
+            return report
+    return {}
+
+
+func _build_load_state_warning(report: Dictionary) -> String:
+    if report.is_empty():
+        return ""
+    var failed := int(report.get("failed", 0))
+    var scanned := int(report.get("scanned", 0))
+    if failed <= 0:
+        return ""
+    var errors: Array = report.get("errors", [])
+    if errors.is_empty():
+        return "Schematic load errors: %d/%d files failed to parse." % [failed, scanned]
+    var first: Dictionary = errors[0] as Dictionary
+    var first_path := str(first.get("path", "unknown"))
+    var first_reason := str(first.get("reason", "unknown_error"))
+    return "Schematic load errors: %d/%d failed.\nFirst failure: %s (%s)" % [failed, scanned, first_path.get_file(), first_reason]
+
+
+func _apply_empty_or_error_state(report: Dictionary) -> void:
+    if _result_count == null:
+        return
+    if not _visible_names.is_empty():
+        return
+    var failed := int(report.get("failed", 0))
+    var scanned := int(report.get("scanned", 0))
+    if failed > 0 and scanned > 0:
+        _result_count.text = "No loadable schematics (%d/%d failed)" % [failed, scanned]
+    else:
+        _result_count.text = "No schematics found. Import one to get started."
+
+
+func _apply_legacy_load_state(report: Dictionary) -> void:
+    if _legacy_container == null:
+        return
+    var label: Label = _legacy_container.get_node_or_null("ScrollContainer/MarginContainer/Label")
+    if label == null:
+        return
+    var failed := int(report.get("failed", 0))
+    var scanned := int(report.get("scanned", 0))
+    if Data.schematics.size() == 0 and failed > 0 and scanned > 0:
+        label.text = "No loadable schematics.\nCheck logs: %d/%d files failed to parse." % [failed, scanned]
+    elif Data.schematics.size() == 0:
+        label.text = "No schematics found.\nImport one to get started."
+    else:
+        label.text = ""
